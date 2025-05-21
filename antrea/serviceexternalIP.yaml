@@ -1,0 +1,11 @@
+apiVersion: crd.antrea.io/v1beta1
+kind: ExternalIPPool
+metadata:
+ name: service-external-ip-pool
+spec:
+ ipRanges:
+ - start: 192.168.1.220
+   end: 192.168.1.240
+ nodeSelector:
+   matchLabels:
+     network-role: ingress-node

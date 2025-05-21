@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parrot-attacker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parrot-attacker
+  template:
+    metadata:
+      labels:
+        app: parrot-attacker
+    spec:
+      containers:
+      - name: parrot
+        image: lujaestfg/parrot-lujaestfg:latest # Custom image with hping3 y mariadb for mysql client
+        command: ["/bin/bash"]
+        # args: ["-c", "while true; do sleep 3600; done"]
+        stdin: true
+        tty: true
+        securityContext:
+          privileged: true

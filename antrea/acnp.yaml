@@ -1,0 +1,20 @@
+apiVersion: crd.antrea.io/v1beta1
+kind: ClusterNetworkPolicy
+metadata:
+  name: acnp-drop-to-services
+spec:
+  priority: 5
+  tier: securityops
+  appliedTo:
+    - podSelector:
+        matchLabels:
+          role: mysql-victim
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+  ingress:
+    - action: Drop
+      toServices:
+        - name: svcName
+          namespace: svcNamespace
+      name: DropToServices

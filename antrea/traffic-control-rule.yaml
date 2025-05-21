@@ -1,0 +1,14 @@
+apiVersion: crd.antrea.io/v1alpha2
+kind: TrafficControl
+metadata:
+  name: mirror-mysql-to-tap0
+spec:
+  appliedTo:
+    podSelector:
+      matchLabels:
+        app: mysql-victim
+  direction: Both
+  action: Mirror
+  targetPort:
+    ovsInternal:
+      name: tap0

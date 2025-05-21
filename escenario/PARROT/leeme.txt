@@ -1,0 +1,32 @@
+
+Crear el dockerfile con las utilidades que necesitemos...
+
+---- 
+
+# Dockerfile
+FROM parrotsec/security  # Or 'parrotsec/core' for a smaller base
+
+RUN apt update && apt install -y \
+    hping3 \
+    mariadb-server \
+    && apt clean && rm -rf /var/lib/apt/lists/*
+
+CMD [ "bash" ]
+---
+
+
+docker build -t parrot-lujaestfg .
+docker run -it --rm parrot-lujaestfg
+
+
+Subirlo a docker hub
+
+
+docker tag parrot-lujaestfg lujaestfg/parrot-lujaestfg:latest
+
+Enviar (primero login)
+docker login -u lujaestfg
+password: (crear un PAT en docker hub)
+
+
+docker push lujaestfg/parrot-lujaestfg:latest

@@ -1,0 +1,9 @@
+# values.yaml
+rbac:
+  create: true
+
+serviceAccount:
+  create: false      # false because we’ve already created it manually
+  name: admin-user
+
+

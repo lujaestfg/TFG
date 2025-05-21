@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: suricata
+  namespace: ids
+spec:
+  selector:
+    matchLabels:
+      app: suricata
+  template:
+    metadata:
+      labels:
+        app: suricata
+      name: suricata
+    spec:
+      hostNetwork: true
+      containers:
+        - name: suricata
+          image: jasonish/suricata:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/bin/suricata
+            - -c
+            - /etc/suricata/suricata.yaml
+            - -i
+            - tap0
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+                - SYS_NICE
+          volumeMounts:
+            - name: host-var-log-suricata
+              mountPath: /var/log/suricata
+            - name: suricata-config-volume
+              mountPath: /etc/suricata/suricata.yaml
+              subPath: suricata.yaml
+              readOnly: true
+            - name: suricata-config-volume
+              mountPath: /etc/suricata/rules/classification.config
+              subPath: classification.config
+              readOnly: true
+            - name: suricata-config-volume
+              mountPath: /etc/suricata/rules/reference.config
+              subPath: reference.config
+              readOnly: true
+            - name: suricata-config-volume
+              mountPath: /etc/suricata/rules/threshold.config
+              subPath: threshold.config
+              readOnly: true
+            - name: suricata-config-volume
+              mountPath: /etc/suricata/rules/myrules.rules
+              subPath: myrules.rules
+              readOnly: true
+      volumes:
+        - name: host-var-log-suricata
+          hostPath:
+            path: /var/log/suricata
+            type: DirectoryOrCreate
+        - name: suricata-config-volume
+          configMap:
+            name: suricata-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: suricata-config
+  namespace: ids
+data:
+  suricata.yaml: |
+    %YAML 1.1
+    ---
+    vars:
+      address-groups:
+        HOME_NET: "[10.10.0.0/16]"
+        EXTERNAL_NET: "!$HOME_NET"
+    # CIDR usado en el cluster de Kubernetes para incluir cualquier direccion de un POD 
+    default-rule-path: /etc/suricata/rules
+    classification-file: /etc/suricata/rules/classification.config
+    reference-config-file: /etc/suricata/rules/reference.config
+    threshold-file: /etc/suricata/rules/threshold.config
+    rule-files:
+      - myrules.rules
+    stats:
+      enabled: no
+    outputs:
+      - eve-log:
+          enabled: yes
+          filetype: regular
+          filename: /var/log/suricata/alertas.json
+          types:
+            - alert
+    af-packet:
+      - interface: tap0
+        threads: auto
+        cluster-id: 100
+        cluster-type: cluster_flow
+        defrag: yes
+        use-mmap: yes
+        ring-size: 100000
+        block-size: 65536
+        buffer-size: 16384
+        tpacket-v3: yes
+        use-emergency-flush: yes
+    host-mode: sniffer-only
+    runmode: workers
+  myrules.rules: |
+    alert tcp any any -> any 3306 (msg:"¡Cuidado! Alguien esta accediendo a MYSQL"; sid:1000002; rev:1;)
+    alert tcp any any -> any 1:65535 (msg:"ALERTA: Posible escaneo de puertos desde Parrot a MySQL"; flags:S; flow:to_server; threshold:type threshold, track by_src, count 10, seconds 10; sid:1000021; rev:2;)
+    # Reglas para cualquier IP (solo el trafico interesante sera redirigido con una regla de Traffic-Control del CNI)
+  classification.config: |
+    config classification: misc-activity,Misc activity,3
+    config classification: attempted-admin,Attempted Administrator Privilege Gain,3
+    config classification: icmp-event,ICMP Event,3
+    config classification: network-scan,Network Scan,3
+  reference.config: |
+    # 
+  threshold.config: |
+   #suppress gen_id 1, sig_id 1000002, track by_src, ip 10.244.0.11
+   #threshold gen_id 1, sig_id 1000003, type limit, track by_src, count 5, seconds 60

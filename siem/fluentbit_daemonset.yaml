@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: siem
+spec:
+  selector:
+    matchLabels:
+      app: fluent-bit
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+    spec:
+      containers:
+      - name: fluent-bit
+        image: fluent/fluent-bit:latest
+        volumeMounts:
+        - name: config
+          mountPath: /fluent-bit/etc/
+        - name: host-var-log-suricata
+          mountPath: /var/log/suricata
+      volumes:
+      - name: config
+        configMap:
+          name: fluent-bit-config
+      - name: host-var-log-suricata
+        hostPath:
+         path: /var/log/suricata
+         type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: siem
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush        1
+        Daemon       Off
+        Log_Level    debug
+        Parsers_File parsers.conf
+    [INPUT]
+        Name              tail
+        Path              /var/log/suricata/*.json
+        Parser            json
+        Tag               suricata
+    [OUTPUT]
+        Name              loki
+        Match             *
+        Host              loki.siem.svc
+        Port              3100
+        Labels            job=suricata
+        Auto_Kubernetes_Labels true
+  parsers.conf: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
