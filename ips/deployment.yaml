@@ -1,34 +1,36 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: alert-handler
-  namespace: your-namespace
+  name: alert-listener
+  namespace: ids
 spec:
   selector:
-    app: alert-handler
+    app: alert-listener
+  loadBalancerIP: "192.168.1.225"
   ports:
     - port: 80
       targetPort: 5000
-
+      protocol: TCP
+  type: LoadBalancer
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: alert-handler
-  namespace: your-namespace
+  name: alert-listener
+  namespace: ids
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: alert-handler
+      app: alert-listener
   template:
     metadata:
       labels:
-        app: alert-handler
+        app: alert-listener
     spec:
       containers:
       - name: webhook
-        image: your-docker-registry/alert-handler:latest
+        image: lujaestfg/alert-listener:latest
         ports:
         - containerPort: 5000
         env:
@@ -37,11 +39,11 @@ spec:
         securityContext:
           runAsUser: 1000
           runAsNonRoot: true
-      serviceAccountName: alert-handler-sa
+      serviceAccountName: alert-listener-sa
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: alert-handler-sa
-  namespace: your-namespace
+  name: alert-listener-sa
+  namespace: ids

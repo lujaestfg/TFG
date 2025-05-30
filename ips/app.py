@@ -124,3 +124,7 @@ def alert():
     except Exception as e:
         print(f"[ERROR] {e}")
         return "Error", 500
+
+if __name__=="main":
+   app.run(host="0.0.0.0", port=5000)
+   

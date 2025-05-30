@@ -1,10 +1,30 @@
+
+Crear el dockerfile con las utilidades que necesitemos...
+
+---- 
+
+FROM python:3.10-slim
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+CMD ["python", "app.py"]
+
+---
+
+
+docker build -t alert-listener .
+docker run -it --rm alert-listener
+
+
+
+Subir a dockerhub
 Crear Repo en dockerhub
 
-docker tag parrot-lujaestfg lujaestfg/parrot-lujaestfg:latest
+docker tag alert-listener lujaestfg/alert-listener:latest
 
 Enviar (primero login)
 docker login -u lujaestfg
-password: (crear un PAT en docker hub)
+password: pat... crear... en docker hub
 
 
-docker push lujaestfg/parrot-lujaestfg:latest
+docker push lujaestfg/alert-listener:latest
