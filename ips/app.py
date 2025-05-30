@@ -5,26 +5,30 @@ import threading
 import logging
 import werkzeug
 
-# Suppress Flask request logging (e.g., favicon, browser GETs)
+# Suppress Flask default logging
 werkzeug_logger = logging.getLogger('werkzeug')
 werkzeug_logger.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 lock = threading.Lock()
-
-# Start with empty or preloaded prevention IDs
 PREVENTION_IDS = set()
 
-# Load Kubernetes in-cluster config
+# Kubernetes in-cluster configuration
 config.load_incluster_config()
 v1 = client.CoreV1Api()
 
-# HTML Template
+# === HTML PAGE WITH JS FIXES ===
 HTML_PAGE = """
 <!DOCTYPE html>
 <html>
 <head>
   <title>Alert Simulator</title>
+  <script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+      alert("JavaScript error: " + msg + " at " + lineNo + ":" + columnNo);
+      return false;
+    };
+  </script>
 </head>
 <body>
   <h2>Configure Prevention Rule IDs</h2>
@@ -46,13 +50,41 @@ HTML_PAGE = """
   <select id="pod"></select>
 
   <div id="podLabels" style="margin-top: 10px;"></div>
-
   <pre id="curlCommand" style="background-color: #f4f4f4; padding: 10px;"></pre>
-
   <button id="sendAlertBtn" onclick="sendSimulatedAlert()" style="display:none;">Send Alert Simulation</button>
 
   <script>
-  window.onload = function () {
+    async function fetchRules() {
+      const res = await fetch('/rules');
+      const rules = await res.json();
+
+      const ul = document.getElementById('rules');
+      const select = document.getElementById('alertRule');
+      if (!ul || !select) return;
+
+      ul.innerHTML = '';
+      select.innerHTML = '<option value="">--Select--</option>';
+
+      rules.forEach(rule => {
+        const li = document.createElement('li');
+        li.textContent = rule;
+
+        const btn = document.createElement('button');
+        btn.textContent = 'Remove';
+        btn.onclick = async () => {
+          await fetch('/rules/' + rule, { method: 'DELETE' });
+          await fetchRules();
+        };
+
+        li.appendChild(btn);
+        ul.appendChild(li);
+
+        const option = document.createElement('option');
+        option.value = rule;
+        option.textContent = rule;
+        select.appendChild(option);
+      });
+    }
 
     async function addRule() {
       const ruleValue = document.getElementById('ruleInput').value;
@@ -70,37 +102,11 @@ HTML_PAGE = """
 
       if (res.ok) {
         document.getElementById('ruleInput').value = '';
-        fetchRules();
+        await fetchRules();  // Ensure refresh after addition
       } else {
         const err = await res.json();
         alert("Error: " + (err.error || 'Failed to add rule.'));
       }
-    }
-
-    async function fetchRules() {
-      const res = await fetch('/rules');
-      const rules = await res.json();
-      const ul = document.getElementById('rules');
-      ul.innerHTML = '';
-      const select = document.getElementById('alertRule');
-      select.innerHTML = '<option value="">--Select--</option>';
-      rules.forEach(rule => {
-        const li = document.createElement('li');
-        li.textContent = rule;
-        const btn = document.createElement('button');
-        btn.textContent = 'Remove';
-        btn.onclick = async () => {
-          await fetch('/rules/' + rule, { method: 'DELETE' });
-          fetchRules();
-        };
-        li.appendChild(btn);
-        ul.appendChild(li);
-
-        const option = document.createElement('option');
-        option.value = rule;
-        option.textContent = rule;
-        select.appendChild(option);
-      });
     }
 
     async function fetchNamespaces() {
@@ -148,8 +154,8 @@ HTML_PAGE = """
         return;
       }
 
-      const labelsText = Object.entries(data.labels).map(([k, v]) => `${k}: ${v}`).join('\n') || 'No labels';
-      document.getElementById('podLabels').textContent = 'Labels:\n' + labelsText;
+      const labelsText = Object.entries(data.labels).map(([k, v]) => `${k}: ${v}`).join('\\n') || 'No labels';
+      document.getElementById('podLabels').textContent = 'Labels:\\n' + labelsText;
 
       const payload = {
         alerts: [{
@@ -161,7 +167,6 @@ HTML_PAGE = """
 
       const curl = `curl -X POST http://localhost:5000/alert \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(payload, null, 2)}'`;
       document.getElementById('curlCommand').textContent = curl;
-
       document.getElementById('sendAlertBtn').style.display = 'inline-block';
     }
 
@@ -191,24 +196,26 @@ HTML_PAGE = """
       alert("Response: " + result);
     }
 
-    document.getElementById('namespace').onchange = async (e) => {
-      if (e.target.value) {
-        await fetchPods(e.target.value);
-        document.getElementById('sendAlertBtn').style.display = 'none';
-      }
+    window.onload = async function () {
+      await fetchRules();
+      await fetchNamespaces();
+
+      document.getElementById('namespace').onchange = async (e) => {
+        if (e.target.value) {
+          await fetchPods(e.target.value);
+          document.getElementById('sendAlertBtn').style.display = 'none';
+        }
+      };
+
+      document.getElementById('alertRule').onchange = updatePodDetails;
+      document.getElementById('pod').onchange = updatePodDetails;
     };
-
-    document.getElementById('alertRule').onchange = updatePodDetails;
-    document.getElementById('pod').onchange = updatePodDetails;
-
-    fetchRules();
-    fetchNamespaces();
-  };
-</script>
-
+  </script>
 </body>
 </html>
 """
+
+# === ROUTES ===
 
 @app.route('/')
 def index():
@@ -223,28 +230,14 @@ def manage_rules():
     elif request.method == 'POST':
         data = request.json
         rule = data.get('rule')
-        if isinstance(rule, int):
-            with lock:
-                PREVENTION_IDS.add(rule)
-            app.logger.info(f"Added rule ID {rule}")
-            return jsonify({"status": "added", "rule": rule}), 201
-        return jsonify({"error": "Invalid rule ID"}), 400
-
-@app.route("/pod-details")
-def pod_details():
-    namespace = request.args.get("namespace")
-    pod_name = request.args.get("pod")
-    if not namespace or not pod_name:
-        return jsonify({"error": "Missing parameters"}), 400
-    try:
-        pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
-        return jsonify({
-            "ip": pod.status.pod_ip,
-            "labels": pod.metadata.labels or {}
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+        try:
+            rule = int(rule)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid rule ID"}), 400
+        with lock:
+            PREVENTION_IDS.add(rule)
+        app.logger.info(f"Added rule ID {rule}")
+        return jsonify({"status": "added", "rule": rule}), 201
 
 @app.route('/rules/<int:rule>', methods=['DELETE'])
 def delete_rule(rule):
@@ -258,21 +251,28 @@ def delete_rule(rule):
 def list_namespaces():
     try:
         namespaces = v1.list_namespace()
-        ns_names = [ns.metadata.name for ns in namespaces.items]
-        return jsonify(ns_names)
+        return jsonify([ns.metadata.name for ns in namespaces.items])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/pods/<namespace>')
 def list_pods(namespace):
     try:
-        if namespace == "all":
-            pods = v1.list_pod_for_all_namespaces()
-        else:
-            pods = v1.list_namespaced_pod(namespace)
-        pod_info = [{"name": pod.metadata.name, "ip": pod.status.pod_ip}
-                    for pod in pods.items if pod.status.pod_ip]
-        return jsonify(pod_info)
+        pods = v1.list_namespaced_pod(namespace)
+        return jsonify([{"name": pod.metadata.name, "ip": pod.status.pod_ip}
+                        for pod in pods.items if pod.status.pod_ip])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/pod-details")
+def pod_details():
+    namespace = request.args.get("namespace")
+    pod_name = request.args.get("pod")
+    if not namespace or not pod_name:
+        return jsonify({"error": "Missing parameters"}), 400
+    try:
+        pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+        return jsonify({"ip": pod.status.pod_ip, "labels": pod.metadata.labels or {}})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -280,34 +280,28 @@ def list_pods(namespace):
 def alert():
     data = request.json
     try:
-        log_line = data["alerts"][0]["annotations"]["summary"]
-        event = json.loads(log_line)
+        summary = data["alerts"][0]["annotations"]["summary"]
+        event = json.loads(summary)
         sig_id = int(event["alert"]["signature_id"])
         src_ip = event.get("src_ip")
 
         with lock:
-            prevention_enabled = sig_id in PREVENTION_IDS
+            if sig_id not in PREVENTION_IDS:
+                app.logger.info(f"Alert {sig_id} is not in prevention list")
+                return "OK", 200
 
-        if not prevention_enabled:
-            app.logger.info(f"Detection-only alert ID {sig_id}, ignoring.")
-            return "OK", 200
-
-        # Find pod by IP and label it
         pods = v1.list_pod_for_all_namespaces(watch=False)
         for pod in pods.items:
             if pod.status.pod_ip == src_ip:
-                ns = pod.metadata.namespace
-                name = pod.metadata.name
-                app.logger.info(f"[ALERT] Isolating pod {name} in {ns} for alert ID {sig_id}")
                 v1.patch_namespaced_pod(
-                    name=name,
-                    namespace=ns,
+                    name=pod.metadata.name,
+                    namespace=pod.metadata.namespace,
                     body={"metadata": {"labels": {"security": "restricted"}}}
                 )
+                app.logger.info(f"Isolated pod {pod.metadata.name} in {pod.metadata.namespace}")
                 return "Isolated", 200
 
-        app.logger.warning(f"No pod found with IP {src_ip}")
-        return "Not found", 404
+        return "Pod not found", 404
     except Exception as e:
         app.logger.error(f"Exception in /alert: {e}")
         return "Error", 500
