@@ -52,6 +52,29 @@ HTML_PAGE = """
   <button id="sendAlertBtn" onclick="sendSimulatedAlert()" style="display:none;">Send Alert Simulation</button>
 
   <script>
+    async function addRule() {
+      const ruleValue = document.getElementById('ruleInput').value;
+      const rule = parseInt(ruleValue);
+      if (isNaN(rule)) {
+        alert("Please enter a valid rule ID (number).");
+        return;
+      }
+
+      const res = await fetch('/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rule: rule })
+      });
+
+      if (res.ok) {
+        document.getElementById('ruleInput').value = '';
+        fetchRules();
+      } else {
+        const err = await res.json();
+        alert("Error: " + (err.error || 'Failed to add rule.'));
+      }
+    }
+
     async function fetchRules() {
       const res = await fetch('/rules');
       const rules = await res.json();
