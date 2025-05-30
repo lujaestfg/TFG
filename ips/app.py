@@ -4,6 +4,11 @@ import json
 import threading
 import logging
 from io import StringIO
+import logging
+import werkzeug
+
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.setLevel(logging.ERROR)  # or logging.CRITICAL to silence all
 
 app = Flask(__name__)
 lock = threading.Lock()
