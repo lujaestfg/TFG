@@ -28,3 +28,18 @@ password: pat... crear... en docker hub
 
 
 docker push lujaestfg/alert-listener:latest
+
+
+----
+
+PROBAR 
+
+curl -X POST http://192.168.1.224/alert \
+  -H "Content-Type: application/json" \
+  -d '{
+    "alerts": [{
+      "annotations": {
+        "summary": "{\"alert\": {\"signature_id\": 1001}, \"src_ip\": \"10.42.1.23\"}"
+      }
+    }]
+  }'
