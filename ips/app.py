@@ -24,102 +24,161 @@ HTML_PAGE = """
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Prevention Rule Config</title>
+  <title>Alert Simulator</title>
 </head>
 <body>
-<h2>Suricata Prevention Rule IDs</h2>
-<ul id="rules"></ul>
-<input type="number" id="ruleInput" placeholder="Rule ID" />
-<button onclick="addRule()">Add Rule</button>
+  <h2>Configure Prevention Rule IDs</h2>
+  <ul id="rules"></ul>
+  <input type="number" id="ruleInput" placeholder="Rule ID" />
+  <button onclick="addRule()">Add Rule</button>
 
-<h2>Simulate Alert</h2>
-<select id="ruleSelect"></select>
-<select id="namespaceSelect" onchange="fetchPods()"></select>
-<select id="podSelect"></select>
-<button onclick="simulateAlert()">Send Simulated Alert</button>
-<pre id="simulationResult" style="background:#f4f4f4;padding:10px;"></pre>
+  <hr>
 
-<script>
-async function fetchRules() {
-  const res = await fetch('/rules');
-  const data = await res.json();
-  const ul = document.getElementById('rules');
-  ul.innerHTML = '';
-  data.forEach(rule => {
-    const li = document.createElement('li');
-    li.textContent = rule;
-    const btn = document.createElement('button');
-    btn.textContent = 'Remove';
-    btn.onclick = async () => {
-      await fetch('/rules/' + rule, {method: 'DELETE'});
-      fetchRules(); fetchRulesForSelect();
-    };
-    li.appendChild(btn);
-    ul.appendChild(li);
-  });
-}
+  <h2>Simulate Alert</h2>
 
-async function addRule() {
-  const input = document.getElementById('ruleInput');
-  const rule = input.value;
-  if (!rule) return;
-  await fetch('/rules', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({"rule": parseInt(rule)})
-  });
-  input.value = '';
-  fetchRules(); fetchRulesForSelect();
-}
+  <label>Rule ID:</label>
+  <select id="alertRule"></select>
 
-async function fetchRulesForSelect() {
-  const res = await fetch('/rules');
-  const data = await res.json();
-  const select = document.getElementById('ruleSelect');
-  select.innerHTML = data.map(rule => `<option value="${rule}">${rule}</option>`).join('');
-}
+  <label>Namespace:</label>
+  <select id="namespace"></select>
 
-async function fetchNamespaces() {
-  const res = await fetch('/namespaces');
-  const data = await res.json();
-  const select = document.getElementById('namespaceSelect');
-  select.innerHTML = '<option value="all">All</option>' + data.map(ns => `<option value="${ns}">${ns}</option>`).join('');
-}
+  <label>Pod:</label>
+  <select id="pod"></select>
 
-async function fetchPods() {
-  const ns = document.getElementById('namespaceSelect').value;
-  const res = await fetch('/pods/' + ns);
-  const data = await res.json();
-  const select = document.getElementById('podSelect');
-  select.innerHTML = data.map(p => `<option value="${p.ip}">${p.name} (${p.ip})</option>`).join('');
-}
+  <div id="podLabels" style="margin-top: 10px;"></div>
 
-async function simulateAlert() {
-  const ruleId = document.getElementById('ruleSelect').value;
-  const podIp = document.getElementById('podSelect').value;
-  const payload = {
-    alerts: [{
-      annotations: {
-        summary: JSON.stringify({
-          alert: { signature_id: parseInt(ruleId) },
-          src_ip: podIp
-        })
+  <pre id="curlCommand" style="background-color: #f4f4f4; padding: 10px;"></pre>
+
+  <button id="sendAlertBtn" onclick="sendSimulatedAlert()" style="display:none;">Send Alert Simulation</button>
+
+  <script>
+    async function fetchRules() {
+      const res = await fetch('/rules');
+      const rules = await res.json();
+      const ul = document.getElementById('rules');
+      ul.innerHTML = '';
+      const select = document.getElementById('alertRule');
+      select.innerHTML = '<option value="">--Select--</option>';
+      rules.forEach(rule => {
+        const li = document.createElement('li');
+        li.textContent = rule;
+        const btn = document.createElement('button');
+        btn.textContent = 'Remove';
+        btn.onclick = async () => {
+          await fetch('/rules/' + rule, {method: 'DELETE'});
+          fetchRules();
+        };
+        li.appendChild(btn);
+        ul.appendChild(li);
+
+        const option = document.createElement('option');
+        option.value = rule;
+        option.textContent = rule;
+        select.appendChild(option);
+      });
+    }
+
+    async function fetchNamespaces() {
+      const res = await fetch('/namespaces');
+      const namespaces = await res.json();
+      const nsSelect = document.getElementById('namespace');
+      nsSelect.innerHTML = '<option value="">--Select--</option>';
+      namespaces.forEach(ns => {
+        const option = document.createElement('option');
+        option.value = ns;
+        option.textContent = ns;
+        nsSelect.appendChild(option);
+      });
+    }
+
+    async function fetchPods(namespace) {
+      const res = await fetch(`/pods/${namespace}`);
+      const pods = await res.json();
+      const podSelect = document.getElementById('pod');
+      podSelect.innerHTML = '<option value="">--Select--</option>';
+      pods.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p;
+        option.textContent = p;
+        podSelect.appendChild(option);
+      });
+    }
+
+    async function updatePodDetails() {
+      const ns = document.getElementById('namespace').value;
+      const pod = document.getElementById('pod').value;
+      const rule = document.getElementById('alertRule').value;
+
+      if (!ns || !pod || !rule) {
+        document.getElementById('sendAlertBtn').style.display = 'none';
+        document.getElementById('curlCommand').textContent = '';
+        return;
       }
-    }]
-  };
 
-  const res = await fetch('/alert', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  const text = await res.text();
-  document.getElementById('simulationResult').textContent = `Status: ${res.status}\\nResponse: ${text}`;
-}
+      const res = await fetch(`/pod-details?namespace=${ns}&pod=${pod}`);
+      const data = await res.json();
 
-// Initial load
-fetchRules(); fetchRulesForSelect(); fetchNamespaces();
-</script>
+      if (data.error) {
+        document.getElementById('podLabels').textContent = 'Error: ' + data.error;
+        return;
+      }
+
+      const labelsText = Object.entries(data.labels).map(([k, v]) => `${k}: ${v}`).join('\n') || 'No labels';
+      document.getElementById('podLabels').textContent = 'Labels:\n' + labelsText;
+
+      const payload = {
+        alerts: [{
+          annotations: {
+            summary: JSON.stringify({ alert: { signature_id: parseInt(rule) }, src_ip: data.ip })
+          }
+        }]
+      };
+
+      const curl = `curl -X POST http://localhost:5000/alert \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(payload, null, 2)}'`;
+      document.getElementById('curlCommand').textContent = curl;
+
+      document.getElementById('sendAlertBtn').style.display = 'inline-block';
+    }
+
+    async function sendSimulatedAlert() {
+      const ns = document.getElementById('namespace').value;
+      const pod = document.getElementById('pod').value;
+      const rule = document.getElementById('alertRule').value;
+
+      const res = await fetch(`/pod-details?namespace=${ns}&pod=${pod}`);
+      const data = await res.json();
+
+      const payload = {
+        alerts: [{
+          annotations: {
+            summary: JSON.stringify({ alert: { signature_id: parseInt(rule) }, src_ip: data.ip })
+          }
+        }]
+      };
+
+      const postRes = await fetch('/alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await postRes.text();
+      alert("Response: " + result);
+    }
+
+    document.getElementById('namespace').onchange = async (e) => {
+      if (e.target.value) {
+        await fetchPods(e.target.value);
+        document.getElementById('sendAlertBtn').style.display = 'none';
+      }
+    };
+
+    document.getElementById('alertRule').onchange = updatePodDetails;
+    document.getElementById('pod').onchange = updatePodDetails;
+
+    fetchRules();
+    fetchNamespaces();
+  </script>
 </body>
 </html>
 """
@@ -143,6 +202,22 @@ def manage_rules():
             app.logger.info(f"Added rule ID {rule}")
             return jsonify({"status": "added", "rule": rule}), 201
         return jsonify({"error": "Invalid rule ID"}), 400
+
+@app.route("/pod-details")
+def pod_details():
+    namespace = request.args.get("namespace")
+    pod_name = request.args.get("pod")
+    if not namespace or not pod_name:
+        return jsonify({"error": "Missing parameters"}), 400
+    try:
+        pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+        return jsonify({
+            "ip": pod.status.pod_ip,
+            "labels": pod.metadata.labels or {}
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/rules/<int:rule>', methods=['DELETE'])
 def delete_rule(rule):
