@@ -1,4 +1,3 @@
-
 Isntalar
 
 helm upgrade kubernetes-dashboard \
