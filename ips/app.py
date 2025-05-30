@@ -52,6 +52,8 @@ HTML_PAGE = """
   <button id="sendAlertBtn" onclick="sendSimulatedAlert()" style="display:none;">Send Alert Simulation</button>
 
   <script>
+  window.onload = function () {
+
     async function addRule() {
       const ruleValue = document.getElementById('ruleInput').value;
       const rule = parseInt(ruleValue);
@@ -88,7 +90,7 @@ HTML_PAGE = """
         const btn = document.createElement('button');
         btn.textContent = 'Remove';
         btn.onclick = async () => {
-          await fetch('/rules/' + rule, {method: 'DELETE'});
+          await fetch('/rules/' + rule, { method: 'DELETE' });
           fetchRules();
         };
         li.appendChild(btn);
@@ -121,8 +123,8 @@ HTML_PAGE = """
       podSelect.innerHTML = '<option value="">--Select--</option>';
       pods.forEach(p => {
         const option = document.createElement('option');
-        option.value = p;
-        option.textContent = p;
+        option.value = p.name;
+        option.textContent = p.name;
         podSelect.appendChild(option);
       });
     }
@@ -201,7 +203,9 @@ HTML_PAGE = """
 
     fetchRules();
     fetchNamespaces();
-  </script>
+  };
+</script>
+
 </body>
 </html>
 """
