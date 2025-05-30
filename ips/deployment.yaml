@@ -50,26 +50,27 @@ kind: ServiceAccount
 metadata:
   name: alert-listener-sa
   namespace: ids
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: pod-reader
+  name: alert-listener-role
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list", "patch"]
-
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: pod-reader-binding
+  name: alert-listener-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: pod-reader
+  name: alert-listener-role
 subjects:
   - kind: ServiceAccount
     name: alert-listener-sa
