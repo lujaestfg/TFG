@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-handler
+  namespace: your-namespace
+spec:
+  selector:
+    app: alert-handler
+  ports:
+    - port: 80
+      targetPort: 5000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-handler
+  namespace: your-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-handler
+  template:
+    metadata:
+      labels:
+        app: alert-handler
+    spec:
+      containers:
+      - name: webhook
+        image: your-docker-registry/alert-handler:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: PREVENTION_IDS
+          value: "[100001, 100002]"  # Replace with Suricata signature IDs you want to block
+        securityContext:
+          runAsUser: 1000
+          runAsNonRoot: true
+      serviceAccountName: alert-handler-sa
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alert-handler-sa
+  namespace: your-namespace

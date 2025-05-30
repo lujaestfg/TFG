@@ -1,0 +1,10 @@
+Crear Repo en dockerhub
+
+docker tag parrot-lujaestfg lujaestfg/parrot-lujaestfg:latest
+
+Enviar (primero login)
+docker login -u lujaestfg
+password: (crear un PAT en docker hub)
+
+
+docker push lujaestfg/parrot-lujaestfg:latest
