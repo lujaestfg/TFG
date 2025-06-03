@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ubuntu-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ubuntu-tools
+  template:
+    metadata:
+      labels:
+        app: ubuntu-tools
+    spec:
+      containers:
+      - name: ubuntu-tools
+        image: python:3.11-slim
+        ports:
+        - containerPort: 5000
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            apt update && \
+            apt install -y vim nano curl git netcat-openbsd iputils-ping && \
+            tail -f /dev/null
+        stdin: true
+        tty: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ubuntu-tools
+spec:
+  selector:
+    app: ubuntu-tools
+  ports:
+    - port: 5000
+      targetPort: 5000
+

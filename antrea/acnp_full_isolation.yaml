@@ -1,0 +1,21 @@
+---
+# COMPLETE ISOLATION INGRESS / EGRESS when tag security=restricted is found in any  
+apiVersion: crd.antrea.io/v1beta1
+kind: ClusterNetworkPolicy
+metadata:
+  name: policy-full-isolation-log
+spec:
+  priority: 5
+  tier: securityops
+  appliedTo:
+    - podSelector:
+        matchLabels:
+          security: restricted
+  ingress:
+    - action: Drop
+      enableLogging: true
+      logLabel: "full-isolation-ingress"
+  egress:
+    - action: Drop
+      enableLogging: true
+      logLabel: "full-isolation-egress"

@@ -16,8 +16,7 @@ spec:
       hostNetwork: true
       containers:
         - name: suricata
-          image: jasonish/suricata:latest
-          imagePullPolicy: IfNotPresent
+          image: jasonish/suricata:7.0.10
           command:
             - /usr/bin/suricata
             - -c

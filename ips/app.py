@@ -306,5 +306,60 @@ def alert():
         app.logger.error(f"Exception in /alert: {e}")
         return "Error", 500
 
+@app.route("/alert_grafana", methods=["POST"])
+def alert_grafana():
+    data = request.json
+    try:
+        if "alerts" in data and "annotations" in data["alerts"][0]:
+            # Grafana-style alert
+            annotation = data["alerts"][0]["annotations"]
+            summary = annotation.get("summary", "")
+            labels = data["alerts"][0].get("labels", {})
+            instance_ip = labels.get("instance", "").split(":")[0]  # May need logic to extract IP
+
+            sig_id = 999999  # Example fixed ID for Grafana alerts
+
+            with lock:
+                if sig_id not in PREVENTION_IDS:
+                    return "OK", 200
+
+            pods = v1.list_pod_for_all_namespaces(watch=False)
+            for pod in pods.items:
+                if pod.status.pod_ip == instance_ip:
+                    v1.patch_namespaced_pod(
+                        name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        body={"metadata": {"labels": {"security": "restricted"}}}
+                    )
+                    return "Grafana alert: Pod isolated", 200
+            return "Pod not found for Grafana alert", 404
+
+        else:
+            # Suricata-style alert
+            summary = data["alerts"][0]["annotations"]["summary"]
+            event = json.loads(summary)
+            sig_id = int(event["alert"]["signature_id"])
+            src_ip = event.get("src_ip")
+
+            with lock:
+                if sig_id not in PREVENTION_IDS:
+                    return "OK", 200
+
+            pods = v1.list_pod_for_all_namespaces(watch=False)
+            for pod in pods.items:
+                if pod.status.pod_ip == src_ip:
+                    v1.patch_namespaced_pod(
+                        name=pod.metadata.name,
+                        namespace=pod.metadata.namespace,
+                        body={"metadata": {"labels": {"security": "restricted"}}}
+                    )
+                    return "Suricata alert: Pod isolated", 200
+            return "Pod not found", 404
+
+    except Exception as e:
+        app.logger.error(f"Alert handler error: {e}")
+        return "Error", 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

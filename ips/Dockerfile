@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libffi-dev \
     libssl-dev \
+    vim \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

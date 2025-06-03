@@ -1,0 +1,21 @@
+---
+# COMPLETE ISOLATION INGRESS / EGRESS when tag security=restricted is found in any  
+apiVersion: crd.antrea.io/v1beta1
+kind: ClusterNetworkPolicy
+metadata:
+  name: policy-allow
+spec:
+  priority: 10
+  tier: securityops
+  appliedTo:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+  ingress:
+    - action: Allow
+      enableLogging: true
+      logLabel: "default-allow-ingress"
+  egress:
+    - action: Allow
+      enableLogging: true
+      logLabel: "default-allow-egress"
