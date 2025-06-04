@@ -10,7 +10,7 @@ spec:
   appliedTo:
     - podSelector:
         matchLabels:
-          security: restricted
+          seguridad: cuarentena
   ingress:
     - action: Drop
       enableLogging: true

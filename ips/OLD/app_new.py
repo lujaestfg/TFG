@@ -7,7 +7,6 @@ import logging
 import werkzeug
 from datetime import datetime, timezone
 import os
-import ipaddress
 
 RULES_FILE = '/etc/rules.json' # esta ruta tendría que ser un PVC para persistencia
 
@@ -342,13 +341,13 @@ async function deleteRule(ruleId) {
     const res = await fetch(`/pod-details?namespace=${namespace}&pod=${pod}`);
     const podData = await res.json();
 
-    const alertData = {
-      date: Math.floor(Date.now() / 1000),
-      event_type: "alert",
-      src_ip: podData.ip,
-      signature_id: rule,
-      signature_text: "Simulated Alert"
-    };
+     const alertJson = {
+        date: Math.floor(Date.now() / 1000),
+        event_type: "alert",
+        src_ip: podData.ip,
+        signature_id: rule || 0,
+        signature_text: "Simulated Alert"
+      };
 
     const response = await fetch('/alert', {
       method: 'POST',
@@ -491,18 +490,6 @@ def alert():
     sig_id = data["signature_id"]
     src_ip = data["src_ip"]
 
-    # Validación de la IP
-    try:
-       ip = ipaddress.ip_address(src_ip)
-       if ip.version != 4:
-          raise ValueError("Solo se aceptan direcciones IPv4")
-    except ValueError as ve:
-       app.logger.error(f"Dirección IP inválida: {src_ip} ({ve})")
-       return jsonify({
-          "error": f"Dirección IP inválida: {src_ip}",
-          "detail": str(ve)
-       }), 400
-
     print("Nuevo Evento recibido")
     print("-------------------- ")
     print("Event type:", data["event_type"])
@@ -527,9 +514,7 @@ def alert():
 
         if not rule_info:
             app.logger.info(f"Alert {sig_id} is not in rule list")
-            return jsonify({
-                "mensaje": f"Nothing to do. Rule ID {sig_id} is not in the rule list"
-              }), 200
+            return f"Nothing to do. Rule ID {sig_id} is not in the rule list", 200
 
         action = rule_info["action"]
         label_map = {
@@ -538,11 +523,7 @@ def alert():
             3: "confinamiento-namespace",
             4: "aislamiento-completo"
         }
-        if action not in label_map:
-         return jsonify({
-            "error": f"Acción desconocida '{action}' para la regla {sig_id}"
-           }), 400
-        label_value = label_map[action]
+        label_value = label_map.get(action, "solo-detectar")
 
         pods = v1.list_pod_for_all_namespaces(watch=False)
         for pod in pods.items:
@@ -552,8 +533,7 @@ def alert():
                     namespace=pod.metadata.namespace,
                     body={"metadata": {"labels": {"seguridad": label_value}}}
                 )
-                app.logger.info(f"Applied label seguridad='{label_value}' to pod {pod.metadata.name} in {pod.metadata.namespace}")
-                print(f"Applied label seguridad='{label_value} to pod {pod.metadata.name} in {pod.metadata.namespace}")
+                app.logger.info(f"Applied label '{label_value}' to pod {pod.metadata.name} in {pod.metadata.namespace}")
                 return jsonify({
                     "status": "labeled",
                     "pod": pod.metadata.name,

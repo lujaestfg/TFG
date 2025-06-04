@@ -89,7 +89,7 @@ data:
         Host              loki.siem.svc
         Port              3100
         Labels            job=suricata,src_ip=$src_ip,dest_ip=$dest_ip,proto=$proto,event_type=$event_type,signature_id=$signature_id,action=$action
-        #Label_keys        src_ip,dest_ip,proto,event_type,signature_id,action
+        #Label_keys       src_ip,dest_ip,proto,event_type,signature_id,action
         Auto_kubernetes_labels on
 
 
@@ -103,13 +103,22 @@ data:
         Label_keys        $nodename,$action,$pod,$sourceip,$sourceport,$destinationip,$destinationport,$loglabel 
         # Auto_kubernetes_labels on
 
+    [OUTPUT]
+        Name              http
+        Match             suricata
+        Host              ubuntu-tools.default.svc 
+        Port              5000
+        URI               /alert
+        Format            json_lines
+        Header            Content-Type application/json
+
   
   parsers.conf: |
 
   custom_parsers.conf: |
       [PARSER]    
-        Name suricata_json
-        Format json 
+        Name        suricata_json
+        Format      json 
         Time_Key    timestamp
         Time_Format %Y-%m-%dT%H:%M:%S.%L%z
 

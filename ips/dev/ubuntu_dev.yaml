@@ -22,9 +22,11 @@ spec:
           - |
             apt update && \
             apt install -y vim nano curl git netcat-openbsd iputils-ping && \
+            pip install kubernetes flask && \
             tail -f /dev/null
         stdin: true
         tty: true
+      serviceAccountName: alert-listener-sa-test
 ---
 apiVersion: v1
 kind: Service
@@ -36,4 +38,36 @@ spec:
   ports:
     - port: 5000
       targetPort: 5000
+---
+# rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alert-listener-sa-test
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alert-listener-role-test
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alert-listener-rolebinding-test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alert-listener-role-test
+subjects:
+  - kind: ServiceAccount
+    name: alert-listener-sa-test
+    namespace: default
 
