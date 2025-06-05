@@ -106,8 +106,8 @@ data:
     [OUTPUT]
         Name              http
         Match             suricata
-        Host              ubuntu-tools.default.svc 
-        Port              5000
+        Host              alert-listener.ids.svc 
+        Port              80
         URI               /alert
         Format            json_lines
         Header            Content-Type application/json

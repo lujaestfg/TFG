@@ -31,20 +31,24 @@ spec:
         app: alert-listener
     spec:
       containers:
-      - name: webhook
-        image: lujaestfg/alert-listener:latest
+      - name: alert-listener
+        image: lujaestfg/alert-listener:1.0
         ports:
         - containerPort: 5000
-        env:
-        - name: PREVENTION_IDS
-          value: "[100001, 100002]"  # Replace with Suricata signature IDs you want to block
         securityContext:
           runAsUser: 1000
           runAsNonRoot: true
+        volumeMounts:
+          - name: rules
+            mountPath: /etc/rules.json
+      volumes:
+      - name: rules
+        persistentVolumeClaim:
+          claimName: alert-listener-rules-pvc
       serviceAccountName: alert-listener-sa
 
 ---
-# rbac.yaml
+# rbac.yaml --> permisos necesarios para que la aplicción pueda listar pods de k8s y hacer cambios 
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -75,3 +79,16 @@ subjects:
   - kind: ServiceAccount
     name: alert-listener-sa
     namespace: ids
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alert-listener-rules-pvc
+  namespace: ids
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+  storageClassName: longhorn-retain # Storage class custom con persistencia de datos

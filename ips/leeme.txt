@@ -20,26 +20,29 @@ docker run -it --rm alert-listener
 Subir a dockerhub
 Crear Repo en dockerhub
 
-docker tag alert-listener lujaestfg/alert-listener:latest
+docker tag alert-listener lujaestfg/alert-listener:1.0 # cambiar segun version
 
 Enviar (primero login)
 docker login -u lujaestfg
 password: pat... crear... en docker hub
 
 
-docker push lujaestfg/alert-listener:latest
+docker push lujaestfg/alert-listener:1.0
 
 
 ----
 
-PROBAR 
+PROBAR EL ENDPOINT 
 
 curl -X POST http://192.168.1.224/alert \
   -H "Content-Type: application/json" \
-  -d '{
-    "alerts": [{
-      "annotations": {
-        "summary": "{\"alert\": {\"signature_id\": 1001}, \"src_ip\": \"10.42.1.23\"}"
-      }
-    }]
-  }'
+  -d @payload.json
+  
+payload.json
+{
+  date: 1717171999.1111),
+  event_type: "alert",
+        src_ip: "192.168.1.2",
+        signature_id: 100002,
+        signature_text: "Alert de test"
+      };

@@ -20,6 +20,9 @@ spec:
           value: "tfg"
         ports:
         - containerPort: 3306
+          name: mysql
+        - containerPort: 80
+          name: http
         volumeMounts:
         - name: mysql-data
           mountPath: /var/lib/mysql
@@ -37,4 +40,8 @@ spec:
     app: mysql-victim
   ports:
   - port: 3306
+    name: mysql
     targetPort: 3306
+  - port: 80
+    name: http
+    targetPort: 80
