@@ -74,6 +74,12 @@ data:
       address-groups:
         HOME_NET: "[10.10.0.0/16]"
         EXTERNAL_NET: "!$HOME_NET"
+    app-layer:
+      protocols:
+        http: 
+          enabled: yes
+          urldecode: yes
+          double-decode: yes
     # CIDR usado en el cluster de Kubernetes para incluir cualquier direccion de un POD 
     default-rule-path: /etc/suricata/rules
     classification-file: /etc/suricata/rules/classification.config
@@ -106,29 +112,29 @@ data:
     runmode: workers
   myrules.rules: |
     alert tcp any any -> any 3306 (msg:"¡Cuidado! Alguien esta accediendo a MYSQL"; sid:1000002; rev:1;)
-    alert tcp any any -> any 1:65535 (msg:"ALERTA: Posible escaneo de puertos desde Parrot a MySQL"; flags:S; flow:to_server; threshold:type threshold, track by_src, count 10, seconds 10; sid:1000021; rev:2;)
-    # Reglas para cualquier IP (solo el trafico interesante sera redirigido con una regla de Traffic-Control del CNI)
+   
 
-    # Detects Log4j exploitation attempts
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4J RCE Request Observed (CVE-2021-44228)"; flow:established, to_server; content:"${jndi:ldap://"; fast_pattern:only; flowbits:set, fox.apachelog4j.rce; threshold:type limit, track by_dst, count 1, seconds 3600; classtype:web-application-attack; priority:3; reference:url, www.lunasec.io/docs/blog/log4j-zero-day/; metadata:CVE 2021-44228; metadata:created_at 2021-12-10; metadata:ids suricata; sid:21003726; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4J RCE Request Observed (CVE-2021-44228)"; flow:established, to_server; content:"${jndi:"; fast_pattern; pcre:"/\$\{jndi\:(rmi|ldaps|dns)\:/"; flowbits:set, fox.apachelog4j.rce; threshold:type limit, track by_dst, count 1, seconds 3600; classtype:web-application-attack; priority:3; reference:url, www.lunasec.io/docs/blog/log4j-zero-day/; metadata:CVE 2021-44228; metadata:created_at 2021-12-10; metadata:ids suricata; sid:21003728; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Defense-Evasive Apache Log4J RCE Request Observed (CVE-2021-44228)"; flow:established, to_server; content:"${jndi:"; fast_pattern; content:!"ldap://"; flowbits:set, fox.apachelog4j.rce; threshold:type limit, track by_dst, count 1, seconds 3600; classtype:web-application-attack; priority:3; reference:url, www.lunasec.io/docs/blog/log4j-zero-day/; reference:url, twitter.com/stereotype32/status/1469313856229228544; metadata:CVE 2021-44228; metadata:created_at 2021-12-10; metadata:ids suricata; sid:21003730; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Defense-Evasive Apache Log4J RCE Request Observed (URL encoded bracket) (CVE-2021-44228)"; flow:established, to_server; content:"%7bjndi:"; nocase; fast_pattern; flowbits:set, fox.apachelog4j.rce; threshold:type limit, track by_dst, count 1, seconds 3600; classtype:web-application-attack; priority:3; reference:url, www.lunasec.io/docs/blog/log4j-zero-day/; reference:url, https://twitter.com/testanull/status/1469549425521348609; metadata:CVE 2021-44228; metadata:created_at 2021-12-11; metadata:ids suricata; sid:21003731; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4j Exploit Attempt in HTTP Header"; flow:established, to_server; content:"${"; http_header; fast_pattern; content:"}"; http_header; distance:0; flowbits:set, fox.apachelog4j.rce.loose; classtype:web-application-attack; priority:3; threshold:type limit, track by_dst, count 1, seconds 3600; reference:url, www.lunasec.io/docs/blog/log4j-zero-day/; reference:url, https://twitter.com/testanull/status/1469549425521348609; metadata:CVE 2021-44228; metadata:created_at 2021-12-11; metadata:ids suricata; sid:21003732; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4j Exploit Attempt in URI"; flow:established,to_server; content:"${"; http_uri; fast_pattern; content:"}"; http_uri; distance:0; flowbits:set, fox.apachelog4j.rce.loose; classtype:web-application-attack; priority:3; threshold:type limit, track by_dst, count 1, seconds 3600; reference:url, www.lunasec.io/docs/blog/log4j-zero-day/; reference:url, https://twitter.com/testanull/status/1469549425521348609; metadata:CVE 2021-44228; metadata:created_at 2021-12-11; metadata:ids suricata; sid:21003733; rev:1;) 
+    # Detecta ataques MySQL
+    #alert http any any -> any any (msg:"SQLi Attempt: INSERT INTO en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*INSERT\\s+INTO/i"; nocase; classtype:web-application-attack; sid:1000001; rev:1;)
+    #alert http any any -> any any (msg:"SQLi Attempt: ' OR 1=1 -- en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*'\s*OR\s+1\s*=\s*1\s*--/i"; nocase; classtype:web-application-attack; sid:1000002; rev:1;)
 
-    # Better and stricter rules, also detects evasion techniques
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4j Exploit Attempt in HTTP Header (strict)"; flow:established,to_server; content:"${"; http_header; fast_pattern; content:"}"; http_header; distance:0; pcre:/(\$\{\w+:.*\}|jndi)/Hi; xbits:set, fox.log4shell.attempt, track ip_dst, expire 1; threshold:type limit, track by_dst, count 1, seconds 3600; classtype:web-application-attack; reference:url,www.lunasec.io/docs/blog/log4j-zero-day/; reference:url,https://twitter.com/testanull/status/1469549425521348609; metadata:CVE 2021-44228; metadata:created_at 2021-12-11; metadata:ids suricata; priority:3; sid:21003734; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4j Exploit Attempt in URI (strict)"; flow:established, to_server; content:"${"; http_uri; fast_pattern; content:"}"; http_uri; distance:0; pcre:/(\$\{\w+:.*\}|jndi)/Ui; xbits:set, fox.log4shell.attempt, track ip_dst, expire 1; classtype:web-application-attack; threshold:type limit, track by_dst, count 1, seconds 3600; reference:url,www.lunasec.io/docs/blog/log4j-zero-day/; reference:url,https://twitter.com/testanull/status/1469549425521348609; metadata:CVE 2021-44228; metadata:created_at 2021-12-11; metadata:ids suricata; priority:3; sid:21003735; rev:1;) 
-    alert http any any -> $HOME_NET any (msg:"FOX-SRT - Exploit - Possible Apache Log4j Exploit Attempt in Client Body (strict)"; flow:to_server; content:"${"; http_client_body; fast_pattern; content:"}"; http_client_body; distance:0; pcre:/(\$\{\w+:.*\}|jndi)/Pi; flowbits:set, fox.apachelog4j.rce.strict; xbits:set,fox.log4shell.attempt,track ip_dst,expire 1; classtype:web-application-attack; threshold:type limit, track by_dst, count 1, seconds 3600; reference:url,www.lunasec.io/docs/blog/log4j-zero-day/; reference:url,https://twitter.com/testanull/status/1469549425521348609; metadata:CVE 2021-44228; metadata:created_at 2021-12-12; metadata:ids suricata; priority:3; sid:21003744; rev:1;)
+    # Detección de Log4J detectando cadena jdni:ldap:// en el contenido de la URL (incluir puertos de interes en detection ports en la sección protocols)
+    alert http any any -> any any (msg:"JNDI LDAP Injection attempt"; flow:to_server,established; http.method; content:"GET"; nocase; http.uri; content:"jndi:ldap://"; fast_pattern; pcre:"/\$\{jndi:ldap:\/\/[^}]+\}/i"; classtype:web-application-attack; sid:1000012; rev:2;)
 
   classification.config: |
+    classification.config: |
     config classification: misc-activity,Misc activity,3
     config classification: attempted-admin,Attempted Administrator Privilege Gain,3
     config classification: icmp-event,ICMP Event,3
     config classification: network-scan,Network Scan,3
+    config classification: web-application-attack,Web Application Attack,2
+
   reference.config: |
-    # 
+    # your own overrides…
+    # then at least:
+    config reference: url,"^[[:alnum:] ./%?&=#:_+-]+$"
+
   threshold.config: |
    #suppress gen_id 1, sig_id 1000002, track by_src, ip 10.244.0.11
    #threshold gen_id 1, sig_id 1000003, type limit, track by_src, count 5, seconds 60
+       config reference: url,"^[[:alnum:] ./%?&=#:_+-]+$"

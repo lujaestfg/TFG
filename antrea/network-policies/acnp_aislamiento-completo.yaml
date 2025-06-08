@@ -1,0 +1,24 @@
+
+# CONFINAMIENTO EN NAMESPACE
+apiVersion: crd.antrea.io/v1beta1
+kind: ClusterNetworkPolicy
+metadata:
+  name: aislamiento-completo
+spec:
+  priority: 5
+  tier: securityops
+  appliedTo:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    - podSelector:
+        matchLabels:
+          seguridad: aislamiento-completo
+  ingress:
+    - action: Drop
+      enableLogging: true
+      logLabel: "aislamiento-completo-ingress"
+  egress:
+    - action: Drop
+      enableLogging: true
+      logLabel: "aislamiento-completo-egress"

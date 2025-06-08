@@ -12,3 +12,18 @@ spec:
   targetPort:
     ovsInternal:
       name: tap0
+---
+apiVersion: crd.antrea.io/v1alpha2
+kind: TrafficControl
+metadata:
+  name: mirror-log4j-to-tap0
+spec:
+  appliedTo:
+    podSelector:
+      matchLabels:
+        app: log4j-victim
+  direction: Both
+  action: Mirror
+  targetPort:
+    ovsInternal:
+      name: tap0

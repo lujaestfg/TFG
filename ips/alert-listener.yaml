@@ -32,18 +32,18 @@ spec:
     spec:
       containers:
       - name: alert-listener
-        image: lujaestfg/alert-listener:1.0
+        image: lujaestfg/alert-listener:1.1
         ports:
         - containerPort: 5000
         securityContext:
           runAsUser: 1000
           runAsNonRoot: true
-        volumeMounts:
-          - name: rules
-            mountPath: /etc/rules.json
+      volumeMounts:
+        - name: rules
+            mountPath: /etc/ips/rules.json
       volumes:
       - name: rules
-        persistentVolumeClaim:
+         persistentVolumeClaim:
           claimName: alert-listener-rules-pvc
       serviceAccountName: alert-listener-sa
 

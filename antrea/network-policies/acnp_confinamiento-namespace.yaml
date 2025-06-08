@@ -1,0 +1,40 @@
+#  CONFINAMIENTO EN NAMESPACE
+apiVersion: crd.antrea.io/v1beta1
+kind: ClusterNetworkPolicy
+metadata:
+  name: confinamiento-namespace
+spec:
+  priority: 10
+  tier: securityops
+  appliedTo:
+    - namespaceSelector:          # Selects all non-system Namespaces in the cluster
+        matchExpressions:
+          - {key:  kubernetes.io/metadata.name, operator: NotIn, values: [kube-system]}
+    - podSelector:
+        matchLabels:
+          seguridad: confinamiento-namespace
+  ingress:
+    - action: Pass
+      from:
+        - namespaces:
+            match: Self           # Skip ACNP evaluation for traffic from Pods in the same Namespace
+      name: PassFromSameNS
+    - action: Drop
+      from:
+        - namespaceSelector: {}   # Drop from Pods from all other Namespaces
+      name: DropFromAllOtherNS
+      enableLogging: true
+      logLabel: "confinamiento-namespace-ingress"
+  egress:
+    - action: Pass
+      to:
+        - namespaces:
+            match: Self           # Skip ACNP evaluation for traffic to Pods in the same Namespace
+      name: PassToSameNS
+    - action: Drop
+      to:
+        - namespaceSelector: {}   # Drop to Pods from all other Namespaces
+      name: DropToAllOtherNS
+      enableLogging: true
+      logLabel: "confinamiento-namespace-egress"
+

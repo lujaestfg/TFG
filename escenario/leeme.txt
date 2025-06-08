@@ -1,0 +1,34 @@
+
+echo "deb http://archive.debian.org/debian/ stretch main contrib non-free" > /etc/apt/sources.list
+echo "deb http://archive.debian.org/debian-security/ stretch/updates main contrib non-free" >> /etc/apt/sources.list
+echo "Acquire::AllowInsecureRepositories \"true\";" > /etc/apt/apt.conf.d/99allow-unsigned
+apt update
+
+
+mysql -u root -p
+
+    CREATE DATABASE IF NOT EXISTS empresa_db;
+    USE empresa_db;
+    CREATE TABLE usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_usuario VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL, -- Almacena contraseñas hasheadas, no texto plano
+    email VARCHAR(100) UNIQUE,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT
+
+INSERT INTO usuarios (nombre_usuario, password, email) VALUES ('maria.lopez', 'maria123', 'maria.lopez@empresa.com');
+INSERT INTO usuarios (nombre_usuario, password, email) VALUES ('juan.perez', 'juan123', 'juan.perez@empresa.com');
+
+SELECT * FROM usuarios;
+
+UPDATE mysql.user SET authentication_string=PASSWORD('12345678'), plugin='mysql_native_password' WHERE User='root' AND Host='localhost';
+FLUSH PRIVILEGES;
+
+
+
+ATAQUE WEB
+----------
+
+usuario';INSERT INTO usuarios (nombre_usuario, password) VALUES ('userfake','12345678'); -- '

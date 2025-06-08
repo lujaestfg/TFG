@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Alert Simulator</title>
+  <style>
+    table.rules-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    table.rules-table thead {
+      background-color: #f4f4f4;
+    }
+
+    table.rules-table th, table.rules-table td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    table.rules-table tbody tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+
+    table.rules-table tbody tr:hover {
+      background-color: #f1f1f1;
+    }
+
+    button.delete-btn {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button.delete-btn:hover {
+      background-color: #d32f2f;
+    }
+  </style>
+</head>
+<body>
+  <h2>Configure Prevention Rule IDs</h2>
+  <table id="rulesTable" class="rules-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Descripción</th>
+        <th>Acción</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="rulesBody"></tbody>
+  </table>
+
+  <input type="number" id="ruleInput" placeholder="Rule ID" />
+  <input type="text" id="descriptionInput" placeholder="Description" />
+  <select id="actionInput">
+    <option value="1">Solo detección</option>
+    <option value="2">Detección con registro de ACL</option>
+    <option value="3">Confinamiento en namespace</option>
+    <option value="4">Confinamiento completo</option>
+  </select>
+  <button onclick="addRule()">Add Rule</button>
+
+  <hr>
+
+  <h2>Simulate Alert</h2>
+
+  <label>Rule ID:</label>
+  <input list="ruleOptions" id="alertRule" placeholder="Enter or select rule ID" />
+  <datalist id="ruleOptions"></datalist>
+
+  <label>Namespace:</label>
+  <select id="namespace"></select>
+
+  <label>Pod:</label>
+  <select id="pod"></select>
+
+  <div id="podLabels" style="margin-top: 10px; white-space: pre-wrap;"></div>
+  <div id="podIP" style="margin-top: 5px; font-weight: bold;"></div>
+
+  <pre id="curlCommand" style="background-color: #f4f4f4; padding: 10px;"></pre>
+
+  <button id="sendAlertBtn" onclick="sendSimulatedAlert()" style="display:none;">Send Alert Simulation</button>
+
+  <h3>Log:</h3>
+  <pre id="logOutput" style="background-color: #eaeaea; height: 150px; overflow-y: auto; padding: 10px;"></pre>
+
+  <h2>Pods con etiqueta de seguridad</h2>
+  <table class="min-w-full bg-white border border-gray-300 mt-2">
+    <thead>
+      <tr class="bg-gray-100">
+        <th class="py-2 px-4 border-b">Pod</th>
+        <th class="py-2 px-4 border-b">Namespace</th>
+        <th class="py-2 px-4 border-b">Etiqueta</th>
+        <th class="py-2 px-4 border-b">Valor</th>
+        <th class="py-2 px-4 border-b">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pod in pods_con_seguridad %}
+      <tr>
+        <td class="py-2 px-4 border-b">{{ pod.name }}</td>
+        <td class="py-2 px-4 border-b">{{ pod.namespace }}</td>
+        <td class="py-2 px-4 border-b">{{ pod.key }}</td>
+        <td class="py-2 px-4 border-b">{{ pod.value }}</td>
+        <td class="py-2 px-4 border-b">
+          <form method="POST" action="/unlabel" class="inline">
+            <input type="hidden" name="pod_name" value="{{ pod.name }}">
+            <input type="hidden" name="namespace" value="{{ pod.namespace }}">
+            <input type="hidden" name="key" value="{{ pod.key }}">
+            <button type="submit" class="bg-red-500 hover:bg-red-700 text-white px-2 py-1 rounded text-sm">Quitar</button>
+          </form>
+
+          <form method="POST" action="/editar_etiqueta" class="inline ml-2">
+            <input type="hidden" name="pod_name" value="{{ pod.name }}">
+            <input type="hidden" name="namespace" value="{{ pod.namespace }}">
+            <input type="hidden" name="key" value="{{ pod.key }}">
+            <select name="new_value" class="text-sm">
+              <option value="solo-detectar">solo-detectar</option>
+              <option value="detectar-registro">detectar-registro</option>
+              <option value="confinamiento-namespace">confinamiento-namespace</option>
+              <option value="aislamiento-completo">aislamiento-completo</option>
+            </select>
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white px-2 py-1 rounded text-sm">Editar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+

@@ -21,7 +21,7 @@ spec:
         args:
           - |
             apt update && \
-            apt install -y vim nano curl git netcat-openbsd iputils-ping && \
+            apt install -y vim nano curl git procps netcat-openbsd iputils-ping && \
             pip install kubernetes flask && \
             tail -f /dev/null
         stdin: true

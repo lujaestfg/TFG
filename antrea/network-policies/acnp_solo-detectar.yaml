@@ -1,21 +1,23 @@
----
-# COMPLETE ISOLATION INGRESS / EGRESS when tag security=restricted is found in any  
+#  SOLO DETECTAR + REGISTRO --> Allow + Registro
 apiVersion: crd.antrea.io/v1beta1
 kind: ClusterNetworkPolicy
 metadata:
-  name: policy-allow
+  name: detectar-registro
 spec:
-  priority: 10
+  priority: 15
   tier: securityops
   appliedTo:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: default
+    - podSelector:
+        matchLabels:
+          seguridad: detectar-registro
   ingress:
     - action: Allow
       enableLogging: true
-      logLabel: "default-allow-ingress"
+      logLabel: "deteccion-registro-ingress"
   egress:
     - action: Allow
       enableLogging: true
-      logLabel: "default-allow-egress"
+      logLabel: "deteccion-registro-egress"
