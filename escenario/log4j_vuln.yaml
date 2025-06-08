@@ -1,21 +1,27 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: log4j-victim
-  labels:
-    app: log4j-victim
 spec:
-  containers:
-    - name: log4j-victim
-      image: vulhub/solr:8.11.0
-      ports:
-        - containerPort: 8983
-          name: p8983
-          protocol: TCP
-        - containerPort: 5005
-          name: p5005 
-          protocol: TCP
-  restartPolicy: Never
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log4j-victim
+  template:
+    metadata:
+      labels:
+        app: log4j-victim
+    spec:
+      containers:
+        - name: log4j-victim
+          image: vulhub/solr:8.11.0
+          ports:
+            - containerPort: 8983
+              name: p8983
+              protocol: TCP
+            - containerPort: 5005
+              name: p5005 
+              protocol: TCP
 ---
 apiVersion: v1
 kind: Service

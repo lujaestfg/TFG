@@ -30,6 +30,8 @@ spec:
       labels:
         app: alert-listener
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: alert-listener
         image: lujaestfg/alert-listener:1.2
@@ -46,6 +48,7 @@ spec:
         persistentVolumeClaim:
           claimName: alert-listener-rules-pvc
       serviceAccountName: alert-listener-sa
+
 ---
 # rbac.yaml --> permisos necesarios para que la aplicción pueda listar pods de k8s y hacer cambios 
 apiVersion: v1

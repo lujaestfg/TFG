@@ -15,9 +15,10 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     vim \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /etc/ips \
-    && chown -R 1000:1000 /etc/ips
+    && rm -rf /var/lib/apt/lists/*
+
+RUN  mkdir -p /etc/ips \
+     && chown -R 1000:1000 /etc/ips
 
 # Install pip dependencies
 COPY requirements.txt .

