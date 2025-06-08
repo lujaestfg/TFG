@@ -32,21 +32,20 @@ spec:
     spec:
       containers:
       - name: alert-listener
-        image: lujaestfg/alert-listener:1.1
+        image: lujaestfg/alert-listener:1.2
         ports:
         - containerPort: 5000
         securityContext:
           runAsUser: 1000
           runAsNonRoot: true
-      volumeMounts:
+        volumeMounts:
         - name: rules
-            mountPath: /etc/ips/rules.json
+          mountPath: /etc/ips
       volumes:
       - name: rules
-         persistentVolumeClaim:
+        persistentVolumeClaim:
           claimName: alert-listener-rules-pvc
       serviceAccountName: alert-listener-sa
-
 ---
 # rbac.yaml --> permisos necesarios para que la aplicción pueda listar pods de k8s y hacer cambios 
 apiVersion: v1

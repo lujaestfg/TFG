@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y \
     vim \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /etc/ips
+    && mkdir -p /etc/ips \
+    && chown -R 1000:1000 /etc/ips
 
 # Install pip dependencies
 COPY requirements.txt .
