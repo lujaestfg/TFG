@@ -116,14 +116,13 @@ data:
     alert http any any -> any any (msg:"General SQL Injection Attempt - ' OR '1'='1' in Password Detected"; flow:to_server, established; content:"POST"; http_method; content:"/index.php"; http_uri; content:"password="; http_client_body; content:"' OR '1'='1"; http_client_body; nocase; sid:1000004; rev:1; priority:1; reference:url,owasp.org/www-community/attacks/SQL_Injection;)
 
     # Detecta ataques MySQL
-    #alert http any any -> any any (msg:"SQLi Attempt: INSERT INTO en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*INSERT\\s+INTO/i"; nocase; classtype:web-application-attack; sid:1000001; rev:1;)
-    #alert http any any -> any any (msg:"SQLi Attempt: ' OR 1=1 -- en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*'\s*OR\s+1\s*=\s*1\s*--/i"; nocase; classtype:web-application-attack; sid:1000002; rev:1;)
+    alert http any any -> any any (msg:"SQLi Attempt: INSERT INTO en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*INSERT\\s+INTO/i"; nocase; classtype:web-application-attack; sid:1000001; rev:1;)
+    alert http any any -> any any (msg:"SQLi Attempt: ' OR 1=1 -- en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*'\s*OR\s+1\s*=\s*1\s*--/i"; nocase; classtype:web-application-attack; sid:1000002; rev:1;)
 
     # Detección de Log4J detectando cadena jdni:ldap:// en el contenido de la URL (incluir puertos de interes en detection ports en la sección protocols)
     alert http any any -> any any (msg:"JNDI LDAP Injection attempt"; flow:to_server,established; http.method; content:"GET"; nocase; http.uri; content:"jndi:ldap://"; fast_pattern; pcre:"/\$\{jndi:ldap:\/\/[^}]+\}/i"; classtype:web-application-attack; sid:1000012; rev:2;)
 
   classification.config: |
-    classification.config: |
     config classification: misc-activity,Misc activity,3
     config classification: attempted-admin,Attempted Administrator Privilege Gain,3
     config classification: icmp-event,ICMP Event,3
