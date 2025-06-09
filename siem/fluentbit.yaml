@@ -99,9 +99,8 @@ data:
         Host              loki.siem.svc
         Port              3100
         Labels            job=networkpolicy
-        # sourceip=$sourceip,sourceport=$sourceport,action=$action,pod=$pod
-        Label_keys        $nodename,$action,$pod,$sourceip,$sourceport,$destinationip,$destinationport,$loglabel 
-        # Auto_kubernetes_labels on
+        Label_keys        $nodename,$action,$pod,$namespace,$sourceip,$sourceport,$destinationip,$destinationport,$loglabel 
+        Auto_kubernetes_labels on
 
     [OUTPUT]
         Name              http

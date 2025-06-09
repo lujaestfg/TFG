@@ -1,46 +1,15 @@
-
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: loki
-  namespace: siem
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: loki
-  template:
-    metadata:
-      labels:
-        app: loki
-    spec:
-      containers:
-      - name: loki
-        image: grafana/loki:2.9.14
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3100
-        args:
-        - -config.file=/etc/loki/config/config.yaml
-        volumeMounts:
-          - name: config
-            mountPath: /etc/loki/config
-      volumes:
-      - name: config
-        configMap:
-          name: loki-config
----
 apiVersion: v1
-kind: Service
+kind: PersistentVolumeClaim
 metadata:
-  name: loki
+  name: loki-data-pvc
   namespace: siem
 spec:
-  selector:
-    app: loki
-  ports:
-  - port: 3100
-    targetPort: 3100
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: longhorn-retain
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -57,11 +26,11 @@ data:
 
     common:
       instance_addr: 127.0.0.1
-      path_prefix: /tmp/loki
+      path_prefix: /loki
       storage:
         filesystem:
-          chunks_directory: /tmp/loki/chunks
-          rules_directory: /tmp/loki/rules
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
       replication_factor: 1
       ring:
         kvstore:
@@ -96,3 +65,60 @@ data:
 
     limits_config:
       split_queries_by_interval: 0
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: siem
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: loki
+          image: grafana/loki:2.9.14
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3100
+          args:
+            - -config.file=/etc/loki/config/config.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /etc/loki/config
+            - name: loki-data-pvc
+              mountPath: /loki
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: config
+          configMap:
+            name: loki-config
+        - name: loki-data-pvc
+          persistentVolumeClaim:
+            claimName: loki-data-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: siem
+spec:
+  selector:
+    app: loki
+  ports:
+    - port: 3100
+      targetPort: 3100
