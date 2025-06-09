@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import os
 import ipaddress
 
-RULES_FILE = '/etc/rules.json'  # Ruta para persistir las reglas (montar como PVC)
+RULES_FILE = '/etc/ips/rules.json'  # Ruta para persistir las reglas (montar como PVC)
 
 def load_rules_from_file():
     global RULES
@@ -612,13 +612,9 @@ HTML_PAGE = """
   <tbody id="labeledBody"></tbody>
 </table>
 </div>
-    <div id="grafanaSection" class="section" style="padding:0;margin:0;">
-<iframe src="http://192.168.1.222/d/9efe89e9-11e7-4267-8bc1-7731da6b9a05/suricata-dashboard?orgId=1&from=now-1h&to=now&timezone=browser&var-namespace=default&var-pod=$__all&refresh=auto&theme=light&kiosk=tv"
-    id="grafanaFrame"
-    style="width:100%;height:calc(100vh - 0px);border:none;display:block;"
-    frameborder="0"
-    allowfullscreen
-></iframe>
+    <div id="grafanaSection" class="section">
+      <h2 class="section-title">Panel de Grafana</h2>
+<iframe src="http://grafana.siem.svc:3000/d-solo/db78a76a-70a0-4ed6-a451-8eb77fed255b/suricata-logs?orgId=1&from=1749206196197&to=1749227796197&timezone=browser&panelId=1&__feature.dashboardSceneSolo" width="450" height="200" frameborder="0"></iframe>
     </div>
   </div>
 </body>
@@ -805,8 +801,6 @@ def labeled_pods():
                 pods_labeled.append({
                     "namespace": pod.metadata.namespace,
                     "name": pod.metadata.name,
-                    "src_ip": pod.status.pod_ip,
-                    "node": pod.spec.node_name,
                     "label": labels.get('seguridad')
                 })
         return jsonify(pods_labeled)
