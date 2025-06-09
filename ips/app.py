@@ -613,7 +613,7 @@ HTML_PAGE = """
 </table>
 </div>
     <div id="grafanaSection" class="section" style="padding:0;margin:0;">
-<iframe src="{{ iframe_url }}"
+<iframe src="http://192.168.1.222/d/9efe89e9-11e7-4267-8bc1-7731da6b9a05/ids-dashboard?orgId=1&from=now-15m&to=now&timezone=browser&var-namespace=$__all&var-pod=$__all&refresh=30s&theme=light&kiosk=tv"
     id="grafanaFrame"
     style="width:100%;height:calc(100vh - 0px);border:none;display:block;"
     frameborder="0"
