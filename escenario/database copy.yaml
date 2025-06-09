@@ -342,7 +342,7 @@ metadata:
 spec:
   containers:
     - name: database
-      image: vulnerables/web-dvwa:1.9
+      image: vulnerables/web-dvwa
       ports:
         - containerPort: 80
       volumeMounts:

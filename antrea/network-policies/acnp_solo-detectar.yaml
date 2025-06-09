@@ -16,8 +16,8 @@ spec:
   ingress:
     - action: Allow
       enableLogging: true
-      logLabel: "deteccion-registro-ingress"
+      logLabel: "detectar-registro-ingress"
   egress:
     - action: Allow
       enableLogging: true
-      logLabel: "deteccion-registro-egress"
+      logLabel: "detectar-registro-egress"
