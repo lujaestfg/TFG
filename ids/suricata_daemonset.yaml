@@ -119,7 +119,7 @@ data:
     #alert http any any -> any any (msg:"SQLi Attempt: INSERT INTO en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*INSERT\\s+INTO/i"; nocase; classtype:web-application-attack; sid:1000001; rev:1;)
     #alert http any any -> any any (msg:"SQLi Attempt: ' OR 1=1 -- en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*'\s*OR\s+1\s*=\s*1\s*--/i"; nocase; classtype:web-application-attack; sid:1000002; rev:1;)
     
-    #alert http any any -> any any (msg:"[SQLi] Posible SQL Injection (1' OR '1'='1'#) en username"; flow:to_server,established; content:"1' OR '1'='1'#"; nocase; http.request_body; classtype:web-application-attack; sid:1000021; rev:1;)
+    alert http any any -> any any (msg:"[SQLi] Posible SQL Injection (1' OR '1'='1'#) en username"; flow:to_server,established; content:"1' OR '1'='1'#"; nocase; http.request_body; classtype:web-application-attack; sid:1000021; rev:1;)
 
 
     # Detección de Log4J detectando cadena jdni:ldap:// en el contenido de la URL o en User Agent (incluir puertos de interes en detection ports en la sección protocols)
