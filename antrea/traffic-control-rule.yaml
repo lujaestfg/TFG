@@ -27,3 +27,18 @@ spec:
   targetPort:
     ovsInternal:
       name: tap0
+---
+apiVersion: crd.antrea.io/v1alpha2
+kind: TrafficControl
+metadata:
+  name: mirror-database-to-tap0
+spec:
+  appliedTo:
+    podSelector:
+      matchLabels:
+        app: database
+  direction: Both
+  action: Mirror
+  targetPort:
+    ovsInternal:
+      name: tap0
