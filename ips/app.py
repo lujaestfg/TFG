@@ -613,7 +613,7 @@ HTML_PAGE = """
 </table>
 </div>
     <div id="grafanaSection" class="section" style="padding:0;margin:0;">
-<iframe src="http://192.168.1.222/d/9efe89e9-11e7-4267-8bc1-7731da6b9a05/suricata-dashboard?orgId=1&from=now-1h&to=now&timezone=browser&var-namespace=default&var-pod=$__all&refresh=auto&theme=light&kiosk=tv"
+<iframe src="{{ iframe_url }}"
     id="grafanaFrame"
     style="width:100%;height:calc(100vh - 0px);border:none;display:block;"
     frameborder="0"
@@ -627,6 +627,7 @@ HTML_PAGE = """
 
 @app.route('/')
 def index():
+    iframe_url = os.environ.get("IFRAME_URL", "http://192.168.1.222")
     return render_template_string(HTML_PAGE)
 
 # ==========================================

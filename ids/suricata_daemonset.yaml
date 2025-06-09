@@ -111,16 +111,21 @@ data:
     host-mode: sniffer-only
     runmode: workers
   myrules.rules: |
-    # alert tcp any any -> any 3306 (msg:"¡Cuidado! Alguien esta accediendo a MYSQL"; sid:1000002; rev:1;)
-    alert http any any -> any any (msg:"[ALERTA] Uso de sqlmap detectado"; flow:to_server,established; content:"sqlmap"; http_user_agent; classtype:web-application-attack; sid:1001003; rev:1;)
+    alert tcp any any -> any 3306 (msg:"¡Cuidado! Alguien esta accediendo a MYSQL"; sid:1000002; rev:1;)
     alert http any any -> any any (msg:"General SQL Injection Attempt - ' OR '1'='1' in Password Detected"; flow:to_server, established; content:"POST"; http_method; content:"/index.php"; http_uri; content:"password="; http_client_body; content:"' OR '1'='1"; http_client_body; nocase; sid:1000004; rev:1; priority:1; reference:url,owasp.org/www-community/attacks/SQL_Injection;)
 
     # Detecta ataques MySQL
+    alert http any any -> any any (msg:"[SQLi] Intento de escaneo con sqlmap detectado"; flow:to_server,established; content:"sqlmap"; http_user_agent; classtype:web-application-attack; sid:1001003; rev:1;)
     alert http any any -> any any (msg:"SQLi Attempt: INSERT INTO en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*INSERT\\s+INTO/i"; nocase; classtype:web-application-attack; sid:1000001; rev:1;)
     alert http any any -> any any (msg:"SQLi Attempt: ' OR 1=1 -- en parámetro user de login"; flow:to_server,established; http.method; content:"POST"; http.uri; content:"/login"; http.client_body; pcre:"/user=[^&]*'\s*OR\s+1\s*=\s*1\s*--/i"; nocase; classtype:web-application-attack; sid:1000002; rev:1;)
+    
+    alert http any any -> any any (msg:"[SQLi] Posible SQL Injection (1' OR '1'='1'#) en username"; flow:to_server,established; content:"1' OR '1'='1'#"; nocase; http.request_body; classtype:web-application-attack; sid:1000021; rev:1;)
 
-    # Detección de Log4J detectando cadena jdni:ldap:// en el contenido de la URL (incluir puertos de interes en detection ports en la sección protocols)
-    alert http any any -> any any (msg:"JNDI LDAP Injection attempt"; flow:to_server,established; http.method; content:"GET"; nocase; http.uri; content:"jndi:ldap://"; fast_pattern; pcre:"/\$\{jndi:ldap:\/\/[^}]+\}/i"; classtype:web-application-attack; sid:1000012; rev:2;)
+
+    # Detección de Log4J detectando cadena jdni:ldap:// en el contenido de la URL o en User Agent (incluir puertos de interes en detection ports en la sección protocols)
+    alert http any any -> any any (msg:"[LOG4J] Posible intento de explotación Log4Shell en URL"; flow:to_server,established; http.method; content:"GET"; nocase; http.uri; content:"jndi:ldap://"; fast_pattern; pcre:"/\$\{jndi:ldap:\/\/[^}]+\}/i"; classtype:web-application-attack; sid:1000012; rev:2;)
+    alert http any any -> any any (msg:"[LOG4J] Posible intento de explotación Log4Shell en User-Agent"; flow:to_server,established; http.header; content:"User-Agent|3a|"; nocase; content:"${jndi:ldap://"; nocase; content:".badreputation.com}"; nocase; classtype:web-application-attack; sid:1000013; rev:1;) 
+
 
   classification.config: |
     config classification: misc-activity,Misc activity,3

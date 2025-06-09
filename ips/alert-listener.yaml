@@ -35,6 +35,9 @@ spec:
       containers:
       - name: alert-listener
         image: lujaestfg/alert-listener:1.41
+        env:
+        - name: IFRAME_URL
+          value: "http://192.168.1.222/d/472d2be6-aae7-4d33-8ea5-607eedb660ff/ids-dashboard?orgId=1&from=now-6h&to=now&timezone=browser&theme=light&kiosk=tv"
         ports:
         - containerPort: 5000
         securityContext:
@@ -48,7 +51,6 @@ spec:
         persistentVolumeClaim:
           claimName: alert-listener-rules-pvc
       serviceAccountName: alert-listener-sa
-
 ---
 # rbac.yaml --> permisos necesarios para que la aplicción pueda listar pods de k8s y hacer cambios 
 apiVersion: v1
