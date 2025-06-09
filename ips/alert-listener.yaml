@@ -34,7 +34,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: alert-listener
-        image: lujaestfg/alert-listener:1.2
+        image: lujaestfg/alert-listener:1.4
         ports:
         - containerPort: 5000
         securityContext:

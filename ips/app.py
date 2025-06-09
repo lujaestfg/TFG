@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import os
 import ipaddress
 
-RULES_FILE = '/etc/rules.json'  # Ruta para persistir las reglas (montar como PVC)
+RULES_FILE = '/etc/ips/rules.json'  # Ruta para persistir las reglas (montar como PVC)
 
 def load_rules_from_file():
     global RULES
