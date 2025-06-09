@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 ---
+=======
+>>>>>>> 838c02a430afb04759654199ba773c405ff3df43
 apiVersion: crd.antrea.io/v1alpha2
 kind: TrafficControl
 metadata:
