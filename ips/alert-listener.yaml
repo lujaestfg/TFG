@@ -83,16 +83,3 @@ subjects:
   - kind: ServiceAccount
     name: alert-listener-sa
     namespace: ids
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: alert-listener-rules-pvc
-  namespace: ids
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Mi
-  storageClassName: longhorn-retain # Storage class custom con persistencia de datos

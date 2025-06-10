@@ -1,0 +1,10 @@
+POST http://localhost:5000/alert HTTP/1.1
+content-type: application/json
+
+{
+  "date": 1749564370,
+  "event_type": "alert",
+  "src_ip": "10.10.5.9",
+  "signature_id": 1111,
+  "signature_text": "Simulated Alert"
+}
