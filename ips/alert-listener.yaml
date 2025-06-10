@@ -34,7 +34,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: alert-listener
-        image: lujaestfg/alert-listener:1.44
+        image: lujaestfg/alert-listener:1.45
         env:
         - name: IFRAME_URL
           value: "http://192.168.1.222/d/472d2be6-aae7-4d33-8ea5-607eedb660ff/ids-dashboard?orgId=1&from=now-6h&to=now&timezone=browser&theme=light&kiosk=tv"
