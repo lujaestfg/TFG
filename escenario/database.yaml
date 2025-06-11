@@ -333,42 +333,49 @@ data:
     echo "Inicialización completada"
 
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: database
   labels:
     app: database
 spec:
-  containers:
-    - name: database
-      image: vulnerables/web-dvwa
-      ports:
-        - containerPort: 80
-      volumeMounts:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      containers:
+        - name: database
+          image: vulnerables/web-dvwa
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: database-init
+              mountPath: /docker-entrypoint-initdb.d
+            - name: php-files
+              mountPath: /app/php-files
+            - name: init-script
+              mountPath: /app/init-script
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/bash", "/app/init-script/init.sh"]
+      volumes:
         - name: database-init
-          mountPath: /docker-entrypoint-initdb.d
+          configMap:
+            name: database-init
         - name: php-files
-          mountPath: /app/php-files
+          configMap:
+            name: php-files
         - name: init-script
-          mountPath: /app/init-script
-      lifecycle:
-        postStart:
-          exec:
-            command: ["/bin/bash", "/app/init-script/init.sh"]
-  volumes:
-    - name: database-init
-      configMap:
-        name: database-init
-    - name: php-files
-      configMap:
-        name: php-files
-    - name: init-script
-      configMap:
-        name: init-script
-        defaultMode: 0755
-  restartPolicy: Never
-
+          configMap:
+            name: init-script
+            defaultMode: 0755
 ---
 apiVersion: v1
 kind: Service
