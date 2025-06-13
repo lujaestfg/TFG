@@ -12,6 +12,10 @@ import ipaddress
 RULES_FILE = '/etc/ips/rules.json'  # Ruta para persistir las reglas (montar como PVC)
 
 def load_rules_from_file():
+    """
+    Carga las reglas desde el archivo JSON persistente. Si no existe, lo crea vacío.
+    Convierte las claves a int para usarlas como signature_id.
+    """
     global RULES
     if not os.path.exists(RULES_FILE):
         with open(RULES_FILE, 'w') as f:
@@ -27,17 +31,22 @@ def load_rules_from_file():
                 data = json.loads(content)
                 RULES = {int(k): v for k, v in data.items()}
     except Exception as e:
+        # Loguea el error si el archivo no puede ser leído o parseado
         app.logger.error(f"[load_rules_from_file] Error al parsear {RULES_FILE}: {e}")
         RULES = {}
 
 def save_rules_to_file():
+    """
+    Guarda las reglas actuales en el archivo JSON persistente.
+    """
     try:
         with open(RULES_FILE, 'w') as f:
             json.dump(RULES, f)
     except Exception as e:
+        # Loguea el error si no se puede guardar
         app.logger.error(f"[save_rules_to_file] Error al guardar {RULES_FILE}: {e}")
 
-# Suprimir logging por defecto de Flask
+# Suprime el logging HTTP por defecto de Flask para limpiar la consola
 werkzeug_logger = logging.getLogger('werkzeug')
 werkzeug_logger.setLevel(logging.INFO)
 
@@ -45,14 +54,19 @@ app = Flask(__name__)
 app.logger.propagate = True
 app.logger.info(">>> Flask logger inicializado")
 
+# Cola para logs de eventos (utilizado en el stream SSE para mostrar logs en el frontend)
 log_queue = queue.Queue()
 
 class QueueHandler(logging.Handler):
+    """
+    Handler personalizado para enviar logs a la cola.
+    Permite mostrar eventos en tiempo real en la UI vía Server Sent Events.
+    """
     def emit(self, record):
         msg = self.format(record)
         log_queue.put(msg)
 
-# ---- Añadir handler de logs a app.logger ----
+# Configuración del logger raíz: solo este handler para evitar duplicados
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 for h in root_logger.handlers[:]:
@@ -60,13 +74,13 @@ for h in root_logger.handlers[:]:
 queue_handler = QueueHandler()
 queue_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 root_logger.addHandler(queue_handler)
-# ---------------------------------------------
 
+# Lock para operaciones thread-safe sobre las reglas
 lock = threading.Lock()
 RULES = {}
 load_rules_from_file()
 
-# Configuración Kubernetes in-cluster
+# Configuración para acceder a la API de Kubernetes desde dentro del clúster
 config.load_incluster_config()
 v1 = client.CoreV1Api()
 
@@ -242,26 +256,114 @@ HTML_PAGE = """
     }
   </style>
   <script>
-    function setActiveSection(sectionId) {
-      document.querySelectorAll('.section').forEach(sec => {
-        sec.classList.remove('active');
-      });
-      document.querySelectorAll('#sidebar ul li').forEach(li => {
-        li.classList.remove('active');
-      });
-      document.getElementById(sectionId).classList.add('active');
-      document.getElementById('menu-' + sectionId).classList.add('active');
-      if (sectionId === "logsSection") {
-        connectLiveLogStream();
-      }
-    }
+function showToast(message, type="success") {
+  const toast = document.getElementById('toast');
+  toast.innerText = message;
 
+  // Color según tipo
+  if (type === "success") toast.style.backgroundColor = "#27ae60";
+  else if (type === "error") toast.style.backgroundColor = "#e74c3c";
+  else toast.style.backgroundColor = "#333";
+
+  toast.style.visibility = "visible";
+  toast.style.opacity = "1";
+  toast.style.bottom = "40px";
+
+  // Oculta después de 2 segundos
+  setTimeout(function(){
+    toast.style.opacity = "0";
+    toast.style.bottom = "10px";
+    setTimeout(function(){
+      toast.style.visibility = "hidden";
+    }, 500);
+  }, 2000);
+}
+function setActiveSection(sectionId) {
+  document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+  document.querySelectorAll('#sidebar ul li').forEach(li => li.classList.remove('active'));
+  document.getElementById(sectionId).classList.add('active');
+  document.getElementById('menu-' + sectionId).classList.add('active');
+  if (sectionId === "logsSection") {
+    connectLiveLogStream();
+  }
+  if (sectionId === "labeledSection") {
+    fillNamespaceLabeledSelector().then(fetchLabeledPodsNamespace);
+  }
+}
+
+// Llenar el selector con todos los namespaces existentes
+async function fillNamespaceLabeledSelector() {
+  try {
+    const res = await fetch('/namespaces');
+    const namespaces = await res.json();
+    const nsSelect = document.getElementById('namespaceLabeled');
+    nsSelect.innerHTML = ''; // Limpiar opciones
+
+    // Opción 'All'
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = 'All';
+    nsSelect.appendChild(optAll);
+
+    namespaces.forEach(ns => {
+      const opt = document.createElement('option');
+      opt.value = ns;
+      opt.textContent = ns;
+      nsSelect.appendChild(opt);
+    });
+
+    // Selecciona "default" por defecto si existe
+    if (namespaces.includes('default')) {
+      nsSelect.value = 'default';
+    } else {
+      nsSelect.value = ''; // O "All" si no existe
+    }
+  } catch (err) {
+    console.error('Error fetching namespaces:', err);
+  }
+}
+
+// Al cargar sección/ventana:
+function setupLabeledPodsSection() {
+  fillNamespaceLabeledSelector().then(fetchLabeledPodsNamespace);
+}
+
+// Recarga la tabla con el filtro seleccionado
+
+async function fetchLabeledPodsNamespace() {
+  const ns = document.getElementById('namespaceLabeled').value;
+  let url = '/labeled-pods';
+  if (ns) url += '?namespace=' + encodeURIComponent(ns);
+  const res = await fetch(url);
+  const pods = await res.json();
+  const tbody = document.getElementById('labeledBody');
+  tbody.innerHTML = '';
+  pods.forEach(pod => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${pod.namespace}</td>
+      <td>${pod.name}</td>
+      <td>${pod.src_ip}</td>
+      <td>${pod.node}</td>
+      <td>${pod.label}</td>
+      <td>
+        <button class="unlabel-btn" onclick="unlabelPod('${pod.namespace}', '${pod.name}')">Eliminar etiqueta</button>
+        <select id="modify-select-${pod.namespace}-${pod.name}">
+          <option value="solo-detectar"${pod.label==='solo-detectar'? ' selected':''}>solo-detectar</option>
+          <option value="detectar-registro"${pod.label==='detectar-registro'? ' selected':''}>detectar-registro</option>
+          <option value="confinamiento-namespace"${pod.label==='confinamiento-namespace'? ' selected':''}>confinamiento-namespace</option>
+          <option value="aislamiento-completo"${pod.label==='aislamiento-completo'? ' selected':''}>aislamiento-completo</option>
+        </select>
+      <button class="modify-btn" onclick="modifyLabel('${pod.namespace}', '${pod.name}')">Modificar</button>
+</td>`;
+    tbody.appendChild(tr);
+  });
+}
     window.onload = function() {
       setActiveSection('rulesSection');
       connectLogStream();
       fetchRules();
       fetchNamespaces();
-      fetchLabeledPods();
     };
 
     function connectLogStream() {
@@ -362,30 +464,36 @@ HTML_PAGE = """
       tr.querySelector('.edit-btn').outerHTML = `<button class="update-btn" onclick="updateRule(${ruleId})">Actualizar</button>`;
     }
 
-    async function updateRule(ruleId) {
-      const desc = document.getElementById(`edit-desc-${ruleId}`).value;
-      const action = parseInt(document.getElementById(`edit-action-${ruleId}`).value);
-      if (!desc || isNaN(action)) {
-        alert("Por favor, completa correctamente los campos de edición.");
-        return;
-      }
-      const res = await fetch(`/rules/${ruleId}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({description: desc, action: action})
-      });
-      if (res.ok) {
-        fetchRules();
-      } else {
-        const err = await res.json();
-        alert("Error al actualizar: " + (err.error || 'Desconocido'));
-      }
-    }
+async function updateRule(ruleId) {
+  const desc = document.getElementById(`edit-desc-${ruleId}`).value;
+  const action = parseInt(document.getElementById(`edit-action-${ruleId}`).value);
+  if (!desc || isNaN(action)) {
+    showToast("Por favor, completa correctamente los campos de edición.", "error");
+    return;
+  }
+  const res = await fetch(`/rules/${ruleId}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({description: desc, action: action})
+  });
+  if (res.ok) {
+    showToast("Regla actualizada correctamente", "success");
+    fetchRules();
+  } else {
+    const err = await res.json();
+    showToast("Error al actualizar: " + (err.error || 'Desconocido'), "error");
+  }
+}
 
-    async function deleteRule(ruleId) {
-      await fetch(`/rules/${ruleId}`, {method: 'DELETE'});
-      fetchRules();
-    }
+async function deleteRule(ruleId) {
+  const res = await fetch(`/rules/${ruleId}`, {method: 'DELETE'});
+  if (res.ok) {
+    showToast("Regla eliminada correctamente", "success");
+    fetchRules();
+  } else {
+    showToast("Error eliminando la regla", "error");
+  }
+}
 
     async function addRule() {
       const ruleValue = parseInt(document.getElementById('ruleInput').value);
@@ -497,10 +605,11 @@ HTML_PAGE = """
     // ========================================
     //    LISTA Y GESTIÓN DE PODS ETIQUETADOS
     // ========================================
-    async function fetchLabeledPods() {
-      const res = await fetch('/labeled-pods');
-      const pods = await res.json();
-      const tbody = document.getElementById('labeledBody');
+    async function fetchLabeledPods(ns) {
+      let url = '/labeled-pods';
+      if (ns) url += '?namespace=' + encodeURIComponent(ns);
+      const res = await fetch(url);
+      const pods = await res.json();const tbody = document.getElementById('labeledBody');
       tbody.innerHTML = '';
       pods.forEach(pod => {
         const tr = document.createElement('tr');
@@ -524,21 +633,34 @@ HTML_PAGE = """
       });
     }
 
-    async function unlabelPod(namespace, podName) {
-      await fetch(`/unlabel/${namespace}/${podName}`, {method: 'POST'});
-      fetchLabeledPods();
-    }
+async function unlabelPod(namespace, podName) {
+  const res = await fetch(`/unlabel/${namespace}/${podName}`, {method: 'POST'});
+  if (res.ok) {
+    showToast("Etiqueta eliminada correctamente", "success");
+    fetchLabeledPodsNamespace();
+  } else {
+    showToast("Error eliminando la etiqueta", "error");
+  }
+}
 
-    async function modifyLabel(namespace, podName) {
-      const select = document.getElementById(`modify-select-${namespace}-${podName}`);
-      const newLabel = select.value;
-      await fetch(`/modify-label/${namespace}/${podName}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({label: newLabel})
-      });
-      fetchLabeledPods();
-    }
+// Modifica la etiqueta de seguridad del pod seleccionado
+async function modifyLabel(namespace, podName) {
+  // Lee el valor seleccionado en el desplegable correspondiente
+  const select = document.getElementById(`modify-select-${namespace}-${podName}`);
+  const newLabel = select.value;
+  const res = await fetch(`/modify-label/${namespace}/${podName}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label: newLabel })
+  });
+  if (res.ok) {
+    showToast("Etiqueta modificada correctamente", "success");
+    fetchLabeledPodsNamespace();
+  } else {
+    const data = await res.json();
+    showToast("Error modificando la etiqueta: " + (data.error || "Desconocido"), "error");
+  }
+}
 
     function connectLiveLogStream() {
       const logOutput = document.getElementById("liveLogOutput");
@@ -610,25 +732,31 @@ HTML_PAGE = """
       <pre id="logOutput"></pre>
     </div>
     <div id="labeledSection" class="section">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-        <h2 class="section-title">Pods Etiquetados para Seguridad</h2>
-        <button class="modify-btn" onclick="fetchLabeledPods()">Refresh</button>
-      </div>
-      <table id="labeledTable">
-        <thead>
-          <tr>
-            <th>Namespace</th>
-            <th>Pod</th>
-            <th>Src IP</th>
-            <th>Node</th>
-            <th>Etiqueta</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="labeledBody"></tbody>
-      </table>
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+    <h2 class="section-title">Pods Etiquetados para Seguridad</h2>
+    <div>
+      <label for="namespaceLabeled">Namespace:</label>
+      <select id="namespaceLabeled" onchange="fetchLabeledPodsNamespace()">
+        <option value="">All</option>
+      </select>
+      <button class="modify-btn" onclick="fetchLabeledPodsNamespace()">Refresh</button>
     </div>
-    <div id="grafanaSection" class="section" style="padding:0;margin:0;">
+  </div>
+  <table id="labeledTable">
+    <thead>
+      <tr>
+        <th>Namespace</th>
+        <th>Pod</th>
+        <th>Src IP</th>
+        <th>Node</th>
+        <th>Etiqueta</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="labeledBody"></tbody>
+  </table>
+</div>
+<div id="grafanaSection" class="section" style="padding:0;margin:0;">
       <iframe src="http://192.168.1.222/d/9efe89e9-11e7-4267-8bc1-7731da6b9a05/suricata-dashboard?orgId=1&from=now-1h&to=now&timezone=browser&var-namespace=default&var-pod=$__all&refresh=auto&theme=light&kiosk=tv"
         id="grafanaFrame"
         style="width:100%;height:calc(100vh - 0px);border:none;display:block;"
@@ -641,20 +769,51 @@ HTML_PAGE = """
       <pre id="liveLogOutput" style="height: 80vh; overflow-y: auto; background: #1a1a1a; color: #fff; padding: 15px; border-radius: 8px; font-size: 13px;"></pre>
     </div>
   </div>
+  <div id="toast" style="
+  visibility: hidden;
+  min-width: 200px;
+  margin-left: -100px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 8px;
+  padding: 14px;
+  position: fixed;
+  z-index: 10000;
+  left: 50%;
+  bottom: 40px;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.5s, bottom 0.5s;
+"></div>
+
 </body>
 </html>
 """
 
 @app.route('/')
 def index():
+    """
+    Devuelve el frontend principal embebido (panel de control).
+    """
     return render_template_string(HTML_PAGE)
+
+
+# --- Gestión de Reglas de Prevención (CRUD) ---
 
 @app.route('/rules', methods=['GET', 'POST'])
 def manage_rules():
+    """
+    GET: Devuelve la lista de reglas (signature_id, descripción, acción).
+    POST: Añade una nueva regla o la sobrescribe si ya existe.
+    """
     global RULES
     if request.method == 'GET':
         with lock:
-            return jsonify([{"rule": rule_id, "description": r["description"], "action": r["action"]} for rule_id, r in RULES.items()])
+            return jsonify([
+                {"rule": rule_id, "description": r["description"], "action": r["action"]}
+                for rule_id, r in RULES.items()
+            ])
     data = request.json
     try:
         rule_id = int(data.get('rule'))
@@ -662,9 +821,10 @@ def manage_rules():
         action = int(data.get('action'))
         if action not in [1, 2, 3, 4]:
             raise ValueError("Acción inválida")
+        if not description.strip():
+            return jsonify({"error": "La descripción no puede estar vacía"}), 400
     except (ValueError, TypeError):
         return jsonify({"error": "Entrada inválida"}), 400
-
     with lock:
         RULES[rule_id] = {"description": description, "action": action}
         save_rules_to_file()
@@ -673,6 +833,9 @@ def manage_rules():
 
 @app.route('/rules/<int:rule>', methods=['PUT'])
 def update_rule(rule):
+    """
+    Actualiza una regla existente por ID.
+    """
     global RULES
     data = request.json
     try:
@@ -682,7 +845,6 @@ def update_rule(rule):
             raise ValueError("Acción inválida")
     except Exception:
         return jsonify({"error": "Entrada inválida"}), 400
-
     with lock:
         if rule not in RULES:
             return jsonify({"error": f"Regla {rule} no encontrada"}), 404
@@ -693,6 +855,9 @@ def update_rule(rule):
 
 @app.route('/rules/<int:rule>', methods=['DELETE'])
 def delete_rule(rule):
+    """
+    Elimina una regla por ID.
+    """
     global RULES
     with lock:
         RULES.pop(rule, None)
@@ -700,8 +865,13 @@ def delete_rule(rule):
     app.logger.info(f"Removed rule ID {rule}")
     return jsonify({"status": "removed", "rule": rule})
 
+# --- Namespaces y Pods ---
+
 @app.route('/namespaces')
 def list_namespaces():
+    """
+    Devuelve la lista de namespaces presentes en el cluster.
+    """
     try:
         namespaces = v1.list_namespace()
         return jsonify([ns.metadata.name for ns in namespaces.items])
@@ -710,6 +880,9 @@ def list_namespaces():
 
 @app.route('/pods/<namespace>')
 def list_pods(namespace):
+    """
+    Devuelve la lista de pods en un namespace específico (con su IP).
+    """
     try:
         pods = v1.list_namespaced_pod(namespace)
         return jsonify([{"name": pod.metadata.name, "ip": pod.status.pod_ip} for pod in pods.items if pod.status.pod_ip])
@@ -718,6 +891,9 @@ def list_pods(namespace):
 
 @app.route('/pod-details')
 def pod_details():
+    """
+    Devuelve información de un pod concreto (IP y etiquetas).
+    """
     namespace = request.args.get("namespace")
     pod_name = request.args.get("pod")
     if not namespace or not pod_name:
@@ -728,8 +904,13 @@ def pod_details():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# --- Log streaming en vivo (Server Sent Events para el frontend) ---
+
 @app.route('/log-stream')
 def stream_logs():
+    """
+    Devuelve un stream SSE con los logs de eventos en tiempo real para el frontend.
+    """
     def event_stream():
         while True:
             try:
@@ -739,14 +920,20 @@ def stream_logs():
                 continue
     return Response(event_stream(), content_type="text/event-stream")
 
+# --- Recepción de alertas (acción automática sobre pods) ---
+
 @app.route('/alert', methods=['POST'])
 def alert():
+    """
+    Recibe una alerta en formato JSON, identifica el pod por IP y aplica la acción configurada:
+    - Etiqueta el pod según la acción de la regla.
+    - Si no hay regla asociada, no realiza acción.
+    """
     data = request.json
-
     timestamp = datetime.fromtimestamp(data.get("date", 0), timezone.utc)
     sig_id = data.get("signature_id")
     src_ip = data.get("src_ip")
-
+    # Valida que la IP es IPv4 válida
     try:
         ip = ipaddress.ip_address(src_ip)
         if ip.version != 4:
@@ -754,20 +941,15 @@ def alert():
     except Exception as ve:
         app.logger.error(f"Dirección IP inválida: {src_ip} ({ve})")
         return jsonify({"error": f"Dirección IP inválida: {src_ip}", "detail": str(ve)}), 400
-
     app.logger.info("Nuevo Evento recibido")
-    print(json.dumps(data, indent=2))
     app.logger.info(json.dumps(data, ensure_ascii=False))
     app.logger.info(f"Event type: {data.get('event_type')} | Signature: {sig_id} | Source IP: {src_ip} | Timestamp: {timestamp}")
-
     try:
         with lock:
             rule_info = RULES.get(sig_id)
-
         if not rule_info:
             app.logger.info(f"Firma {sig_id} no esta en la lista de reglas de IPS")
             return jsonify({"mensaje": f"Nada que hacer. Rule ID {sig_id} no esta en la lista de reglas IPS"}), 200
-
         action = rule_info.get("action")
         label_map = {
             1: "solo-detectar",
@@ -777,9 +959,8 @@ def alert():
         }
         if action not in label_map:
             return jsonify({"error": f"Acción desconocida '{action}' para la regla {sig_id}"}), 400
-
         label_value = label_map[action]
-
+        # Busca el pod con la IP indicada y lo etiqueta
         pods = v1.list_pod_for_all_namespaces(watch=False)
         for pod in pods.items:
             if pod.status.pod_ip == src_ip:
@@ -796,21 +977,29 @@ def alert():
                     "rule_id": sig_id,
                     "applied_label": {"seguridad": label_value},
                 }), 200
-
         return jsonify({"error": "Pod no encontrado"}), 404
-
     except Exception as e:
         app.logger.error(f"Error handling alert: {e}")
         return jsonify({"error": str(e)}), 500
 
+# --- Listado y gestión de pods etiquetados para seguridad ---
+
 @app.route('/labeled-pods')
 def labeled_pods():
+    """
+    Devuelve todos los pods etiquetados con alguna acción de seguridad.
+    Permite filtrar por namespace mediante parámetro GET (?namespace=...).
+    """
+    ns = request.args.get("namespace")
     pods_labeled = []
     try:
-        pods = v1.list_pod_for_all_namespaces(watch=False)
+        if ns:
+            pods = v1.list_namespaced_pod(ns)
+        else:
+            pods = v1.list_pod_for_all_namespaces(watch=False)
         for pod in pods.items:
             labels = pod.metadata.labels or {}
-            if 'seguridad' in labels:
+            if 'seguridad' in labels and labels['seguridad']:
                 pods_labeled.append({
                     "namespace": pod.metadata.namespace,
                     "name": pod.metadata.name,
@@ -822,8 +1011,12 @@ def labeled_pods():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/unlabel/<namespace>/<pod>', methods=['POST'])
 def unlabel_pod(namespace, pod):
+    """
+    Elimina la etiqueta 'seguridad' de un pod concreto.
+    """
     try:
         patch = {
             "metadata": {
@@ -843,11 +1036,11 @@ def unlabel_pod(namespace, pod):
         app.logger.error(f"Error eliminando etiqueta: {e}")
         return jsonify({"error": str(e)}), 500
 
-
-
-
 @app.route('/modify-label/<namespace>/<pod>', methods=['POST'])
 def modify_label(namespace, pod):
+    """
+    Modifica el valor de la etiqueta 'seguridad' para un pod concreto.
+    """
     data = request.json
     new_label = data.get("label")
     if new_label not in ["solo-detectar", "detectar-registro", "confinamiento-namespace", "aislamiento-completo"]:
@@ -858,6 +1051,19 @@ def modify_label(namespace, pod):
         return jsonify({"status": "modified"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# --- Ruta extra para debug visual del estado de pods y etiquetas ---
+@app.route('/debug-pods')
+def debug_pods():
+    """
+    Devuelve todos los pods y sus etiquetas, útil para depuración rápida.
+    """
+    pods = v1.list_pod_for_all_namespaces(watch=False)
+    output = []
+    for pod in pods.items:
+        output.append(f"{pod.metadata.namespace}/{pod.metadata.name} {pod.metadata.labels}")
+    return "<br>".join(output)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
